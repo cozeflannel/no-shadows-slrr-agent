@@ -20,6 +20,12 @@
  * (cannotSee), never estimated. When the bot's last run, or a source that is ON, is late or missing, the answer is never
  * calm: now.level is 'unknown' and its headline says why first (SPEC 3.4).
  *
+ * With Control row 56 ON ("Speed numbers: leave out when the bot was not running", RunLog.gs), and only then, the answer
+ * also says when the bot ran, from its run log (health.runLog, and what that log can't see), each Head start story's
+ * speed check (early.stories[].speedCheck), how long Burson's alert waited for the bot to run (the alert's timeline) and
+ * the pick-up time leaving out the alerts posted before the bot came back (pressure.load.pickupNote, next to the usual
+ * one, which is as it was). OFF, none of it is read and the answer is as before.
+ *
  * Its own helpers are named dl…_ and its constants DL_…_ ("dashboard, live"), apart from the shared base it starts from
  * (Dashboard.gs: dashAccess_, dashCtx_, dashBuildInfo_, dashRefusal_). No text it returns holds an emoji (the web app
  * shows none: dlPlain_).
@@ -1320,12 +1326,78 @@ function dlHealth_(ctx, props, log, cl, now, msgs) {
   }
   out.why = out.level === 'ok' ? '' : [out.headline.replace(/^Can't be sure: /, ''), bad.length > 1 ? `${bad.length} sources are late or missing` : '']
     .filter(Boolean).join('; ');
-  out.cannotSee = dlCannotSee_(sw, log, cl, now, msgs);
+  // Control row 56 ON only: when the bot ran, from its run log (RunLog.gs). OFF, nothing is read and there's no runLog
+  if (sw.speedHonest === true) {
+    try {
+      out.runLog = dlRunLog_(runLogRead_(ctx.ss), now);
+    } catch (e) {
+      out.runLog = dlRunLog_({ ok: false, why: dlErr_(e) }, now);
+    }
+  }
+  out.cannotSee = dlCannotSee_(sw, log, cl, now, msgs, out.runLog);
   return out;
 }
 
-/** What this page can't see, each {what, why, fix} in plain words: the standing gaps, and the ones of this moment. Pure but for GEN. */
-function dlCannotSee_(sw, log, cl, now, msgs) {
+/**
+ * When the bot ran, for the Now strip (Control row 56 ON only), from its run log as RunLog.gs runLogRead_ reads it
+ * (`log`): {ok, why, start, last, days, spans, more, open, notes}. spans: the stretches of the last 7 days in which the
+ * bot was not running, paused, failing or not known (RUN_LOG_GAP_STATES_), newest first, at most 10, each {from, to,
+ * state, words (RunLog.gs runLogWords_), open (still going at its last run)}; more: how many more of them there were;
+ * open: the stretch still going {state, from, last} or null; notes: the plain lines after them (running the whole time,
+ * where the log starts, no run recorded lately). Every time is one the run log recorded: what it can't say is said to
+ * be not known, never worked out. Pure but for GEN.
+ */
+function dlRunLog_(log, now) {
+  const l = log && typeof log === 'object' ? log : { ok: false, why: 'it could not be read' };
+  const since = now - 7 * DL_DAY_MS_;
+  const out = { ok: l.ok === true, why: l.ok === true ? '' : dlPlain_(l.why || 'it could not be read', 300), start: Number(l.start) || 0,
+    last: Number(l.last) || 0, days: 7, spans: [], more: 0, open: null, notes: [] };
+  if (!out.ok) {
+    out.notes.push(`Not known: the "When the bot ran" tab could not be read (${dlRunLogWhy_(out.why)}).`);
+    return out;
+  }
+  if (!out.start) {
+    out.notes.push('Not known yet: its run log has no record. It starts at the bot\'s next run with row 56 ON.');
+    return out;
+  }
+  const all = Array.isArray(l.spans) ? l.spans.filter(s => s && typeof s === 'object') : [];
+  const open = all.find(s => s.open === true);
+  if (open) out.open = { state: dlText_(open.state), from: Number(open.from) || 0, last: Number(open.to) || 0 };
+  const gaps = all.filter(s => runLogGapState_(s.state) && Number(s.to) > since && Number(s.from) < now)
+    .sort((p, q) => Number(q.from) - Number(p.from));
+  out.more = Math.max(0, gaps.length - 10);
+  out.spans = gaps.slice(0, 10).map(s => {
+    const x = { from: Number(s.from), to: Number(s.to), state: dlText_(s.state),
+      words: dlPlain_(`${runLogWords_(s)}${s.open === true ? ' (still going at its last run)' : ''}`, 400) };
+    if (s.open === true) x.open = true;
+    return x;
+  });
+  const quiet = out.last > 0 && now - out.last > RUN_LOG_GAP_MS_;
+  const upTo = quiet ? `, up to its last recorded run (${dlClock_(out.last, now)})` : '';
+  if (!gaps.length) {
+    out.notes.push(out.start > since ? `It was running the whole time since its run log started${upTo}.`
+      : `It was running the whole time in the last 7 days${upTo}.`);
+  } else if (out.more) {
+    out.notes.push(`And ${out.more} more stretch${out.more === 1 ? '' : 'es'} in the last 7 days: see the "When the bot ran" tab.`);
+  }
+  if (out.start > since) out.notes.push(`Its run log starts ${dlClock_(out.start, now)}: before then, not known.`);
+  if (quiet) {
+    out.notes.push(`No run is recorded after ${dlClock_(out.last, now)} (more than 10 minutes ago).`);
+  }
+  return out;
+}
+
+/** The reason the run log can't be read, without the words that already say so. Pure. */
+function dlRunLogWhy_(why) {
+  return String(why || 'it could not be read').replace(/^the "When the bot ran" tab could not be read: /, '') || 'it could not be read';
+}
+
+/**
+ * What this page can't see, each {what, why, fix} in plain words: the standing gaps, and the ones of this moment.
+ * `runLog` (dlRunLog_'s, Control row 56 ON only): when the bot was running before its run log starts, or at all when it
+ * can't be read. Pure but for GEN.
+ */
+function dlCannotSee_(sw, log, cl, now, msgs, runLog) {
   const out = [
     { what: 'Whether the bot\'s every-minute trigger is installed and allowed to run',
       why: 'Apps Script shows a trigger only to the account that made it, and a trigger that lost its permission stops before the bot can write anything.',
@@ -1358,6 +1430,19 @@ function dlCannotSee_(sw, log, cl, now, msgs) {
     out.push({ what: `Burson messages the bot could not review, before ${dlClock_(msgs.oldestAt, now)}`,
       why: `Only the newest ${DL_MESSAGE_ROWS_} rows of the Message log are read, and they do not reach back 24 hours.`,
       fix: 'Look for raw_forward and dead rows on the Message log tab.' });
+  }
+  if (runLog && typeof runLog === 'object') {
+    if (runLog.ok !== true) {
+      out.push({ what: 'When the bot was running', why: `The "When the bot ran" tab could not be read: ${dlRunLogWhy_(runLog.why)}.`,
+        fix: 'Open the bot\'s sheet: the tab must keep the title the bot wrote in A1.' });
+    } else if (!(Number(runLog.start) > 0)) {
+      out.push({ what: 'When the bot was running', why: 'Its run log (Control row 56) has no record yet: it starts at the bot\'s next run. Until then the bot keeps no record of when it was running, so speed numbers can\'t be checked against it.',
+        fix: '' });
+    } else if (Number(runLog.start) > now - 7 * DL_DAY_MS_) {
+      out.push({ what: `When the bot was running before ${dlClock_(runLog.start, now)}`,
+        why: 'Its run log (Control row 56) starts then. Before that the bot kept no record of when it was running, so older speed numbers can\'t be checked against it.',
+        fix: '' });
+    }
   }
   return out;
 }
@@ -1576,7 +1661,7 @@ function dlNow_(health, alerts, clusters, stuck, now, sw) {
  * the stories' speed leaders; the bot's own load (row 51 ON only). A window the rows read don't reach back to is said
  * (complete: false), never counted short. Never throws.
  */
-function dlPressure_(alerts, log, clusters, sw, props, now) {
+function dlPressure_(alerts, log, clusters, sw, props, now, runLog) {
   const reach = since => dlLogReaches_(log, since);
   const complete = { day: reach(now - DL_DAY_MS_), prevDay: reach(now - 2 * DL_DAY_MS_), week: reach(now - 7 * DL_DAY_MS_),
     prevWeek: reach(now - 14 * DL_DAY_MS_) };
@@ -1624,6 +1709,15 @@ function dlPressure_(alerts, log, clusters, sw, props, now) {
       out.load = { measured: true, runSec: u.runSec, budgetSec: u.budgetSec, share: Math.round(u.f * 1000) / 1000, calls: u.fetches,
         callBudget: u.fetchBudget, callsCounted: u.counted, pickupP90Sec: u.pickup.p90, pickupRuns: u.pickup.n,
         today: { reviews: day.rev, quickLooks: day.ql, stop: day.stop ? { what: day.stop.k, at: day.stop.at || null } : null } };
+      // Control row 56 ON only (OpenEngine.gs openPickup_): the pick-up time leaving out the alerts posted before the bot
+      // came back, on its own line under the one above (which is as it was)
+      if (sw.speedHonest === true) {
+        out.load.pickupNote = dlPickupNote_(runLog, now, u.pickupC);
+        if (u.pickupC) {
+          out.load.pickupKeptP90Sec = u.pickupC.p90;
+          out.load.pickupKept = u.pickupC.n;
+        }
+      }
     } catch (e) {
       out.load = { measured: false, why: `The bot's run-time record could not be read: ${dlErr_(e)}.` };
     }
@@ -1631,6 +1725,25 @@ function dlPressure_(alerts, log, clusters, sw, props, now) {
     out.load = { measured: false, why: `Not measured with row ${dlSwitchRow_('openEngine') || 51} OFF: the bot counts its own run time and outside calls against a budget only for the open engine.` };
   }
   return out;
+}
+
+/**
+ * The pick-up time with Control row 56 ON, on its own line under the usual one (which counts every pick-up, as before):
+ * today's pick-ups (Eastern) but those of alerts posted before the bot last came back after a stop, a pause or failing
+ * runs (OpenEngine.gs openPickup_: RUN_LEDGER.pc; `kept`: openUsage_'s pickupC {p90, n, since}), counted from the run
+ * row 56 was ON at first today (since). From the run log as the Now strip has it (`runLog`: dlRunLog_'s): when it can't
+ * be read or has no record yet, nothing can be left out, and it says so. Pure but for GEN.
+ */
+function dlPickupNote_(runLog, now, kept) {
+  const r = runLog && typeof runLog === 'object' ? runLog : {};
+  const head = 'Leaving out alerts posted before the bot came back after a stop, a pause or failing runs (row 56): ';
+  if (r.ok !== true) return `${head}not known, its run log can't be read (${dlRunLogWhy_(r.why)})`;
+  if (!(Number(r.start) > 0)) return `${head}not known yet, its run log has no record (it starts at the bot's next run)`;
+  const k = kept && typeof kept === 'object' ? kept : null;
+  const since = k && Number(k.since) > 0 ? ` since ${dlClock_(Number(k.since), now)}` : '';
+  if (!k || !(Number(k.n) > 0) || k.p90 === null || k.p90 === undefined) return `${head}none counted yet today${since}`;
+  return `${head}90% within ${Math.round(Number(k.p90)).toLocaleString('en-US')} s (${Number(k.n).toLocaleString('en-US')} ` +
+    `alert${Number(k.n) === 1 ? '' : 's'}${since})`;
 }
 
 /**
@@ -1668,9 +1781,11 @@ function dlPipeline_(alerts, stuck, now, sw) {
  * How early things were caught (SPEC 3.5 early): the Head start tab as the bot wrote it (its own only), read-only: {ok,
  * why (when it can't be read), rebuilt (its "Rebuilt ... ET" words), numbers: [{label, week, month}], stories: [{type,
  * at, story, link, product, tag, bursonAt, headStart, imsAt, imsHeadStart, matchedOn, appAlert, postBursonAt, postHeadStart}]}.
- * Never throws.
+ * With Control row 56 ON (`sw.speedHonest`) only, each story also has `speedCheck`: its cell of the column the tab
+ * has then, "Speed check: was the bot running?" (HeadStart.gs HEAD_START_CHECK_HEADER_), found by its name in the
+ * EVERY STORY header; until the tab has that column (its next rebuild), `speedCheckWhy` says so. Never throws.
  */
-function dlEarly_(ss) {
+function dlEarly_(ss, sw) {
   const out = { ok: false, why: '', rebuilt: '', numbers: [], stories: [] };
   try {
     const sh = ss.getSheetByName(HEAD_START_TAB_);
@@ -1702,22 +1817,49 @@ function dlEarly_(ss) {
     }
     const every = values.findIndex(v => /^EVERY STORY/.test(dlText_(v[0])));
     if (every >= 0) {
+      // Control row 56 ON only: the speed check column (after the hidden state columns, so outside `width`)
+      const checks = sw && sw.speedHonest === true ? dlSpeedChecks_(sh, every, last) : null;
       for (let i = every + 2; i < values.length && out.stories.length < DL_ROWS_MAX_; i++) {
         const v = values[i];
         if (!dlText_(v[0]) || dlText_(v[0]) === 'None yet') break;
         const story = dlCellLink_(v[2], formulas && formulas[i] && formulas[i][2]);
         // the times as the bot wrote them ("yyyy-MM-dd HH:mm" ET): Sheets turns those cells into dates (the tab gives the
         // columns a date format), which are written back the same way, never left out
-        out.stories.push({ type: dlText_(v[0]), at: dlTimeCell_(v[1]), story: dlPlain_(story.label, 160), link: dlUrl_(story.url),
+        const row = { type: dlText_(v[0]), at: dlTimeCell_(v[1]), story: dlPlain_(story.label, 160), link: dlUrl_(story.url),
           product: dlText_(v[3]), tag: dlText_(v[4]), bursonAt: dlTimeCell_(v[5]), headStart: dlText_(v[6]),
           imsAt: dlTimeCell_(v[7]), imsHeadStart: dlText_(v[8]), matchedOn: dlText_(v[9]), appAlert: dlText_(v[10]),
-          postBursonAt: dlTimeCell_(v[14]), postHeadStart: dlText_(v[15]) });
+          postBursonAt: dlTimeCell_(v[14]), postHeadStart: dlText_(v[15]) };
+        if (checks && checks.col) row.speedCheck = dlPlain_(checks.cells[i], 800);
+        out.stories.push(row);
+      }
+      if (checks && !checks.col && out.stories.length) {
+        out.speedCheckWhy = checks.why || 'The Head start tab has no "Speed check: was the bot running?" column yet: the bot adds it at its next rebuild (every 10 minutes).';
       }
     }
   } catch (e) {
     out.why = `The Head start tab could not be read: ${dlErr_(e)}.`;
   }
   return out;
+}
+
+/**
+ * The Head start tab's speed check column (Control row 56 ON; HeadStart.gs): {col (1-based; 0 when the tab has none
+ * yet), cells (its texts, by the index of the tab's rows from row 1), why (when it could not be read)}. `every`: the
+ * index of the EVERY STORY title row (its header is the row after it). Read-only. Never throws.
+ */
+function dlSpeedChecks_(sh, every, last) {
+  const none = why => ({ col: 0, cells: [], why: why || '' });
+  try {
+    const name = typeof HEAD_START_CHECK_HEADER_ === 'string' ? HEAD_START_CHECK_HEADER_ : 'Speed check: was the bot running?';
+    const cols = sh.getLastColumn();
+    if (!(cols >= HEAD_START_STATE_COL_)) return none();
+    const head = sh.getRange(every + 2, 1, 1, cols).getValues()[0].map(dlText_);
+    const col = head.indexOf(name) + 1;
+    if (!col) return none();
+    return { col, cells: sh.getRange(1, col, last, 1).getValues().map(v => dlText_(v[0])), why: '' };
+  } catch (e) {
+    return none(`The Head start tab's "Speed check: was the bot running?" column could not be read: ${dlErr_(e)}.`);
+  }
 }
 
 /**
@@ -1866,9 +2008,9 @@ function dlSnapshotOf_(ctx) {
     health, now: dlNow_(health, all, stories, stuck, now, sw), clusters: stories,
     alerts: week.slice().sort((p, q) => (q.at || 0) - (p.at || 0)).slice(0, DL_ALERTS_MAX_).map(x => x.a),
     alertsTotal: week.length,
-    pressure: dlPressure_(all, log, stories, sw, props, now),
+    pressure: dlPressure_(all, log, stories, sw, props, now, health.runLog),
     pipeline: dlPipeline_(all, stuck, now, sw),
-    early: dlEarly_(ctx.ss),
+    early: dlEarly_(ctx.ss, sw),
     held: dlHeld_(edTab, watchTab, props, now, sw),
   };
   snap.questions = dlQuestions_(snap, all, now);
@@ -1972,12 +2114,27 @@ function dlFieldsOf_(row) {
   return out;
 }
 
-/** What happened to the alert, in time order, from the times its row keeps (SPEC 3.7 timeline). Pure. */
-function dlTimelineOf_(row, kind) {
+/**
+ * What happened to the alert, in time order, from the times its row keeps (SPEC 3.7 timeline). With Control row 56 ON
+ * (`o.log`: the run log, RunLog.gs runLogRead_), Burson's alert that waited more than 10 minutes from reaching the space
+ * to the bot picking it up says how long, right after "The bot picked it up", and why when the run log knows (the bot
+ * was not running, paused or failing then, or it is not known). Pure but for GEN.
+ */
+function dlTimelineOf_(row, kind, o) {
   const out = [];
   const add = (at, what) => { const t = headStartTime_(at); if (t) out.push({ at: t, what }); };
   add(row.source_at, kind === 'burson' ? 'Burson\'s alert reached the space' : 'Its card was posted');
   add(row.seen_at, 'The bot picked it up');
+  if (o && o.log && kind === 'burson') {
+    const from = headStartTime_(row.source_at);
+    const seen = headStartTime_(row.seen_at);
+    if (from && seen && seen - from > RUN_LOG_GAP_MS_) {
+      const c = runLogCheckIn_(o.log, from, seen);
+      const more = c && Number(c.more) > 0 ? ` (and ${c.more} more stretch${Number(c.more) === 1 ? '' : 'es'})` : '';
+      out.push({ at: seen, what: `It waited ${Math.round((seen - from) / DL_MIN_MS_).toLocaleString('en-US')} min for the bot to run` +
+        (c ? `: ${dlPlain_(c.words, 400)}${more}` : '') });
+    }
+  }
   add(row.created_at, 'The bot recorded its review');
   const es = dlText_(row.email_status);
   if (headStartTime_(row.email_at) && headStartTime_(row.email_at) !== headStartTime_(row.email_sent_at)) {
@@ -2117,7 +2274,8 @@ function dlAlertDetail_(ctx, props, info, log, id) {
       followup,
       ongoing: /^ongoing/i.test(dlText_(dlFieldsOf_(row).issue_status)) || dlText_(esc.status).toUpperCase() === 'ONGOING',
     },
-    timeline: dlTimelineOf_(row, x.kind),
+    // Control row 56 ON only: Burson's alert's wait for the bot to run, from the run log (OFF: nothing more is read)
+    timeline: dlTimelineOf_(row, x.kind, (ctx.switches || {}).speedHonest === true && x.kind === 'burson' ? { log: runLogRead_(ctx.ss) } : undefined),
     related: dlRelatedOf_(x, all, new Set(cl.all.map(c => String(c.id)))),
     cannotSee,
   };

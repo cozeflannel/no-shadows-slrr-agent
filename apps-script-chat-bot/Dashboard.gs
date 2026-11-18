@@ -22,7 +22,7 @@
 // The dashboard's own build id: changed by hand whenever the dashboard's code changes. poll() writes it to the property
 // BOT_BUILD while row 54 is ON (the time trigger runs the newest code); the web app compares it with its own copy (a
 // deployment serves the code of its version), and says so when the link runs an older version than the bot
-const DASH_BUILD_ = '2026-11-18.5';
+const DASH_BUILD_ = '2026-11-18.6';
 const DASH_BUILD_PROP_ = 'BOT_BUILD';
 const DASH_ACL_CACHE_SEC_ = 600;
 const DASH_TITLE_ = 'Burson QA bot · Live';

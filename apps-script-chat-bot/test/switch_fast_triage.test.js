@@ -568,7 +568,7 @@ module.exports = function (H) {
       eq([sh.cell(47, 1), sh.cell(48, 1), sh.cell(49, 1), sh.cell(50, 1), sh.cell(51, 1), sh.cell(52, 1), sh.cell(53, 1), sh.cell(54, 1),
         sh.cell(55, 1), sh.cell(56, 1), sh.cell(57, 1)],
         ['Early watch: independent_reports at or above', 'Early Detection: also read the AMIE table', 'Early Detection: also read Brandwatch live (not X)', 'Proactive watch: also read the AMIE table', 'Open engine: judgment in place of caps', '', '',
-          'Live dashboard', 'Slide deliveries', '', 'How it works']);
+          'Live dashboard', 'Slide deliveries', 'Speed numbers: leave out when the bot was not running', 'How it works']);  // row 56 is a switch now (it was blank)
 
       if (disableFastTriageHooks) {
         t.bot.ftStart_ = () => null;
@@ -1433,7 +1433,7 @@ module.exports = function (H) {
     ]);
     const PROBS = ['0.05', '0.10', '0.15', '0.20', '0.25', '0.30', '0.35', '0.40', '0.45', '0.50', '0.55', '0.60', '0.65', '0.70', '0.75', '0.80', '0.85', '0.90', '0.95'];
     eq(specs.map(s => s.choices), [PROBS, PROBS, PROBS, PROBS, ['2', '3', '4'], PROBS]);
-    eq([sh.cell(46, 1), sh.cell(48, 1), sh.cell(49, 1), sh.cell(52, 1), sh.cell(53, 1), sh.cell(56, 1), sh.cell(57, 1)], ['Write early-wave records to BigQuery', 'Early Detection: also read the AMIE table', 'Early Detection: also read Brandwatch live (not X)', '', '', '', 'How it works']);
+    eq([sh.cell(46, 1), sh.cell(48, 1), sh.cell(49, 1), sh.cell(52, 1), sh.cell(53, 1), sh.cell(56, 1), sh.cell(57, 1)], ['Write early-wave records to BigQuery', 'Early Detection: also read the AMIE table', 'Early Detection: also read Brandwatch live (not X)', '', '', 'Speed numbers: leave out when the bot was not running', 'How it works']);  // row 56 is a switch now (it was blank)
 
     // 1. Every bar row has strict dropdown validation (allowInvalid === false) and seed value on setup()
     for (const s of specs) {
@@ -1498,7 +1498,7 @@ module.exports = function (H) {
       ['Early watch: about_google and brand_risk, each at or above', '0.70'], ['Early watch: distinct accounts, at least', '4'],
       ['Write early-wave records to BigQuery', 'ON'], ['Early watch: independent_reports at or above', '0.30'],
       ['Early Detection: also read the AMIE table', 'OFF'], ['Early Detection: also read Brandwatch live (not X)', 'OFF'], ['Proactive watch: also read the AMIE table', 'OFF'], ['Open engine: judgment in place of caps', 'OFF'], ['', ''], ['', ''],
-      ['Live dashboard', 'OFF'], ['Slide deliveries', 'OFF'], ['', ''], ['How it works', '']]);
+      ['Live dashboard', 'OFF'], ['Slide deliveries', 'OFF'], ['Speed numbers: leave out when the bot was not running', 'OFF'], ['How it works', '']]);  // row 56 is a switch now (it was blank)
     assert.match(first.tab.cell(43, 3), /^✓ Hold-back \(row 40\) and early watch \(row 39\) require answer confidence at or above 0\.55/);
     eq(first.tab.rows.filter(r => String(r[0]).trim() === 'How it works').length, 1);
     eq(first.o.bot.ftBarsFor_(first.o.bot.readControl_(first.tab).ftBars).values, { about: 0.10, noise: 0.90, conf: 0.55, watch: 0.70, accounts: 4, independent: 0.30 });

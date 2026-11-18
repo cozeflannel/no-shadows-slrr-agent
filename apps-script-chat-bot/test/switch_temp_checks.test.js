@@ -270,12 +270,13 @@ module.exports = H => {
       'Early watch: about_google and brand_risk, each at or above', 'Early watch: distinct accounts, at least',
       'Write early-wave records to BigQuery', 'Early watch: independent_reports at or above', 'Early Detection: also read the AMIE table',
       'Early Detection: also read Brandwatch live (not X)', 'Proactive watch: also read the AMIE table', 'Open engine: judgment in place of caps', '', '',
-      'Live dashboard', 'Slide deliveries', '', 'How it works']);
+      'Live dashboard', 'Slide deliveries', 'Speed numbers: leave out when the bot was not running', 'How it works']);  // row 56 is a switch now (it was blank)
     const help = t.control().rows.slice(57).map(r => String(r[0] || ''));
     assert.ok(help.some(l => /^• Temp checks: row 36, OFF until you turn it ON\. In a thread in the Mirror space or the Other alerts space \(B33\)/.test(l)));
-    assert.ok(help.some(l => /^• Rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54 and 55 are switches/.test(l)));
-    eq([SWITCHES.length, SWITCHES[SWITCHES.length - 12].key, SWITCHES[SWITCHES.length - 11].key, B.switchRows_().slice(-12)],
-      [31, 'tempChecks', 'bsgTestEmails', [36, 37, 38, 39, 40, 46, 48, 49, 50, 51, 54, 55]]);
+    assert.ok(help.some(l => /^• Rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54, 55 and 56 are switches/.test(l)));  // now ends "54, 55 and 56"
+    // 32 switches now (row 56, RunLog.gs, came last): tempChecks and bsgTestEmails are one further from the end
+    eq([SWITCHES.length, SWITCHES[SWITCHES.length - 13].key, SWITCHES[SWITCHES.length - 12].key, B.switchRows_().slice(-13)],
+      [32, 'tempChecks', 'bsgTestEmails', [36, 37, 38, 39, 40, 46, 48, 49, 50, 51, 54, 55, 56]]);
     // The deployed layout: row 36 blank, "How it works" at row 37
     t.control().getRange(36, 1, 1, 3).setValues([['', '', '']]);
     t.control().getRange(37, 1, 1, 3).setValues([['How it works', '', '']]);

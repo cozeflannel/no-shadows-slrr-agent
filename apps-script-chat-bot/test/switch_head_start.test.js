@@ -1610,7 +1610,10 @@ module.exports = H => {
       'next to Burson\'s alert on the same story and the IMs\' email: who alerted first, and by how much. It appears once this app has an alert ' +
       'of its own, and updates every 10 minutes at most.');
     assert.match(help[i + 2], /^• The Follow-up tab /);
-    eq([help.filter(l => /Head start/.test(l)).length, i > 0], [1, true]);
+    // two help lines name the tab now: its own, and row 56's ("Speed numbers: leave out when the bot was not running",
+    // RunLog.gs), which says that switch adds numbers to it; only its own says the tab exists (it was the only one)
+    const row56 = l => l.startsWith('• Speed numbers: leave out when the bot was not running: ');
+    eq([help.filter(l => /Head start/.test(l)).length, help.filter(l => /Head start/.test(l) && !row56(l)).length, i > 0], [2, 1, true]);
     // On the tab setup() makes: "How it works" is where it was (row 57, under the blank row 56), every line is under it in
     // order, and the rows kept for the help hold its title and every line
     const t = e2e();
@@ -1620,12 +1623,14 @@ module.exports = H => {
     eq([ROW, sh.cell(ROW - 9, 1), sh.cell(ROW - 8, 1), sh.cell(ROW - 7, 1), sh.cell(ROW - 6, 1), sh.cell(ROW - 5, 1), sh.cell(ROW - 4, 1),
       sh.cell(ROW - 3, 1), sh.cell(ROW - 2, 1), sh.cell(ROW - 1, 1), sh.cell(ROW, 1)],
       [57, 'Early Detection: also read the AMIE table', 'Early Detection: also read Brandwatch live (not X)', 'Proactive watch: also read the AMIE table', 'Open engine: judgment in place of caps', '', '',
-        'Live dashboard', 'Slide deliveries', '', 'How it works']);
+        'Live dashboard', 'Slide deliveries', 'Speed numbers: leave out when the bot was not running', 'How it works']);  // row 56 is a switch now (it was blank)
     eq(help.map((_, k) => sh.cell(ROW + 1 + k, 1)), help);
     eq([sh.cell(ROW + 1 + i, 1), sh.cell(ROW + 2 + i, 1), sh.rows.length, B.ev('CONTROL_HELP_ROWS_') >= help.length + 1],
       [help[i], help[i + 1], ROW + help.length, true]);
-    // the tab has no row or switch of its own: the only place the Control tab names it is that line
-    eq(sh.rows.map((x, k) => (x.some(v => /head start/i.test(String(v))) ? k + 1 : 0)).filter(Boolean), [ROW + 2 + i]);
+    // the tab has no row or switch of its own: the only places the Control tab names it are that line and row 56's help
+    // line (that switch adds numbers to it; it was that line alone)
+    eq(sh.rows.map((x, k) => (x.some(v => /head start/i.test(String(v))) ? k + 1 : 0)).filter(Boolean),
+      [ROW + 2 + i, ROW + 1 + help.findIndex(row56)]);
     assert.ok(!B.ev('CONTROL_SWITCHES_').some(x => /head ?start/i.test(`${x.key} ${x.label}`)));
   });
 
@@ -2003,7 +2008,8 @@ module.exports = H => {
     // it has no switch and no row of its own on the Control tab: only "How it works" says it exists, in one line
     const HELP = B.ev('CONTROL_HELP_ROW_');
     const mentions = on.t.control().rows.map((x, i) => (x.some(v => /head start/i.test(String(v))) ? i + 1 : 0)).filter(Boolean);
-    eq([mentions.length, mentions[0] > HELP, on.t.control().cell(HELP, 1)], [1, true, 'How it works']);
+    // (row 56's help line names the tab too, since that switch adds numbers to it: two mentions, both in "How it works")
+    eq([mentions.length, mentions.every(r => r > HELP), on.t.control().cell(HELP, 1)], [2, true, 'How it works']);
     assert.ok(!B.ev('CONTROL_SWITCHES_').some(s => /head ?start/i.test(`${s.key} ${s.label}`)));
   });
 

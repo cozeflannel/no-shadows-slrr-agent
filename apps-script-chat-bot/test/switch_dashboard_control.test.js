@@ -27,7 +27,11 @@ module.exports = H => {
   const cells = (sh, r) => [1, 2, 3].map(c => sh.cell(r, c));
   const BLANK = ['', '', ''];
   const HELP = () => B.ev('CONTROL_HELP_');
-  const NEW_LINE = l => l.startsWith(`• ${LABEL54}: `) || l.startsWith(`• ${LABEL55}: `);
+  // row 56 ("Speed numbers: leave out when the bot was not running", RunLog.gs) is now a switch too: its help line came
+  // after rows 54-55's, so a tab from before rows 54-55 has none of the three
+  const LABEL56 = 'Speed numbers: leave out when the bot was not running';
+  const OFF56 = 'OFF (the speed numbers count every alert as they always have, and the bot keeps no record of when it was running)';
+  const NEW_LINE = l => l.startsWith(`• ${LABEL54}: `) || l.startsWith(`• ${LABEL55}: `) || l.startsWith(`• ${LABEL56}: `);
 
   /** A bot after setup(), with a tester in B30. */
   const world = g => {
@@ -44,13 +48,14 @@ module.exports = H => {
    */
   const olderTab = sh => {
     const old = HELP().filter(l => !NEW_LINE(l))
-      .map(l => l.replace('36-40, 46, 48-51, 54 and 55 are switches', '36-40, 46 and 48-51 are switches'));
+      .map(l => l.replace('36-40, 46, 48-51, 54, 55 and 56 are switches', '36-40, 46 and 48-51 are switches'));
     sh.rows = sh.rows.slice(0, 51);
     sh.rows[51] = [''];
     sh.rows[52] = ['How it works'];
     old.forEach((l, i) => { sh.rows[53 + i] = [l]; });
     delete sh.validations['54,2'];
     delete sh.validations['55,2'];
+    delete sh.validations['56,2'];
     return old;
   };
 
@@ -87,10 +92,11 @@ module.exports = H => {
   // Rows 54 and 55, rows 52-53, the help at row 57
   // -----------------------------------------------------------------------------------------------------------------
 
-  test('dashboard control: a new Control tab has row 54 "Live dashboard" and row 55 "Slide deliveries", OFF with their ON / OFF dropdowns and what OFF means in column C; rows 52-53 and 56 blank; "How it works" at row 57 with a help line for each ("• Live dashboard: row 54, OFF until you turn it ON", "• Slide deliveries: row 55, ..."); both start OFF and read OFF', () => {
+  test('dashboard control: a new Control tab has row 54 "Live dashboard" and row 55 "Slide deliveries", OFF with their ON / OFF dropdowns and what OFF means in column C; rows 52-53 blank (row 56 is now a switch too); "How it works" at row 57 with a help line for each ("• Live dashboard: row 54, OFF until you turn it ON", "• Slide deliveries: row 55, ..."); both start OFF and read OFF', () => {
     const { t, sh } = world();
+    // row 56 is no longer blank: it is the "Speed numbers" switch (RunLog.gs), OFF
     eq([cells(sh, 52), cells(sh, 53), cells(sh, 54), cells(sh, 55), cells(sh, 56)],
-      [BLANK, BLANK, [LABEL54, 'OFF', OFF54], [LABEL55, 'OFF', OFF55], BLANK]);
+      [BLANK, BLANK, [LABEL54, 'OFF', OFF54], [LABEL55, 'OFF', OFF55], [LABEL56, 'OFF', OFF56]]);
     eq([sh.validations['54,2'].values, sh.validations['55,2'].values, sh.validations['52,2'], sh.validations['53,2']], [ON_OFF, ON_OFF, undefined, undefined]);
     helpAt57(sh, 'new tab');
     const line54 = HELP().filter(l => l.startsWith(`• ${LABEL54}: `));
@@ -100,14 +106,16 @@ module.exports = H => {
     assert.match(line55[0], /^• Slide deliveries: row 55, OFF until you turn it ON\. /);
     assert.match(line55[0], /while Testing, only the testers in B30/);
     assert.match(line55[0], /Nothing of it goes to S-F Burson or the Burson test copy/);
-    assert.ok(HELP().some(l => /^• Rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54 and 55 are switches/.test(l)));
-    // the switch list: appended after the open engine (indices 0-28 unchanged), each row its own
+    // the switch-rows line now ends "54, 55 and 56" (row 56 is a switch)
+    assert.ok(HELP().some(l => /^• Rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54, 55 and 56 are switches/.test(l)));
+    // the switch list: appended after the open engine (indices 0-28 unchanged), each row its own; row 56's switch comes
+    // after them (32 switches, not 31; the run of rows from 54 is 3 long, not 2)
     const sw = B.ev('CONTROL_SWITCHES_');
-    eq([sw.length, sw.slice(-2).map(s => [s.key, s.label, s.row]), B.switchRows_().slice(-3), sw[28].key],
-      [31, [['liveDashboard', LABEL54, 54], ['slideDeliveries', LABEL55, 55]], [51, 54, 55], 'openEngine']);
-    eq(B.switchRowRuns_().slice(-2).map(r => [r.start, r.idx.length]), [[48, 4], [54, 2]]);
+    eq([sw.length, sw.slice(-3, -1).map(s => [s.key, s.label, s.row]), B.switchRows_().slice(-4, -1), sw[28].key],
+      [32, [['liveDashboard', LABEL54, 54], ['slideDeliveries', LABEL55, 55]], [51, 54, 55], 'openEngine']);
+    eq(B.switchRowRuns_().slice(-2).map(r => [r.start, r.idx.length]), [[48, 4], [54, 3]]);
     // the texts: no record-only words, no emoji, no address; the ON texts are the same LIVE or Testing
-    for (const s of sw.slice(-2)) {
+    for (const s of sw.slice(-3, -1)) {
       const texts = [s.label, B.switchOffText_(s), s.on('', true), s.on('', false), s.on('tester@team.test', undefined)].join(' ');
       assert.ok(!/\b(?:s[h]adow|record-only|recording only|observe-only|dry-run)\b/i.test(texts), texts);
       assert.ok(!/@/.test(texts), texts);
@@ -133,7 +141,7 @@ module.exports = H => {
     eq(above(), before);
     eq([cells(sh, 52), cells(sh, 53), cells(sh, 54), cells(sh, 55), cells(sh, 56)],
       [['Ask the leads before turning row 19 ON', 'note B52', 'note C52'], ['', 'note B53', 'note C53'],
-        [LABEL54, 'OFF', OFF54], [LABEL55, 'OFF', OFF55], BLANK]);
+        [LABEL54, 'OFF', OFF54], [LABEL55, 'OFF', OFF55], [LABEL56, 'OFF', OFF56]]);  // row 56 is now a switch, OFF
     eq([sh.validations['54,2'].values, sh.validations['55,2'].values], [ON_OFF, ON_OFF]);
     helpAt57(sh, 'after the first run');
     eq(t.bot.readControl_(sh).switches, Object.assign(B.switchesOff_(), { earlyWave: true }));
@@ -201,16 +209,19 @@ module.exports = H => {
     sh.rows[53] = [HELP()[2], 'OFF', OFF54];
     sh.rows[55] = [HELP()[3]];
     t.bot.writeControlHelp_(sh);
-    eq([sh.cell(52, 1), sh.cell(53, 1), sh.cell(54, 1), sh.cell(56, 1)], ['', '', HELP()[2], '']);
-    eq(writes.filter(w => w[0] === 54 || w[0] === 55), []);
+    // A56 is a switch row now (row 56, RunLog.gs): like A54, the old help line there is left for ensureSwitchRows_
+    eq([sh.cell(52, 1), sh.cell(53, 1), sh.cell(54, 1), sh.cell(56, 1)], ['', '', HELP()[2], HELP()[3]]);
+    eq(writes.filter(w => w[0] === 54 || w[0] === 55 || w[0] === 56), []);
     sh.rows[55] = ['• my own note under the switches'];
     sh.rows[51] = ['A note of mine'];
     t.bot.writeControlHelp_(sh);
     eq([sh.cell(52, 1), sh.cell(56, 1)], ['A note of mine', '• my own note under the switches']);
     sh.getRange = orig;
-    t.poll();  // the run puts row 54's switch back
-    eq([cells(sh, 54), cells(sh, 55), sh.cell(52, 1), sh.cell(56, 1)],
-      [[LABEL54, 'OFF', OFF54], [LABEL55, 'OFF', OFF55], 'A note of mine', '• my own note under the switches']);
+    t.poll();  // the run puts row 54's switch back, and row 56's
+    // row 56 is a switch now: the run writes it over A56, and the person's note there is kept below the help instead
+    eq([cells(sh, 54), cells(sh, 55), sh.cell(52, 1), cells(sh, 56)],
+      [[LABEL54, 'OFF', OFF54], [LABEL55, 'OFF', OFF55], 'A note of mine', [LABEL56, 'OFF', OFF56]]);
+    eq(sh.rows.slice(57 + B.ev('CONTROL_HELP_ROWS_') - 1).map(r => r[0]), ['• my own note under the switches']);
     helpAt57(sh, 'after a run');
   });
 

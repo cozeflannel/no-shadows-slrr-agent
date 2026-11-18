@@ -1,4 +1,4 @@
-// The Control tab's switches (rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54 and 55, Control.gs) and the 49,000-character cell cap (Sheets.gs, Speed.gs).
+// The Control tab's switches (rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54, 55 and 56, Control.gs) and the 49,000-character cell cap (Sheets.gs, Speed.gs).
 'use strict';
 
 module.exports = H => {
@@ -10,17 +10,17 @@ module.exports = H => {
     'Work directly in B25 (Google-only)', 'Proactive watch', 'Temp checks', 'Group test emails', 'Fast triage (Gemini Decisions)',
     'Fast triage: rank and early watch', 'Fast triage: hold back noise', 'Write early-wave records to BigQuery',
     'Early Detection: also read the AMIE table', 'Early Detection: also read Brandwatch live (not X)', 'Proactive watch: also read the AMIE table', 'Open engine: judgment in place of caps',
-    'Live dashboard', 'Slide deliveries'];
+    'Live dashboard', 'Slide deliveries', 'Speed numbers: leave out when the bot was not running'];  // row 56 is a switch now
   const KEYS = ['autoSend', 'autoTns', 'kbStartAlerts', 'autoFindLinks', 'directBq', 'writeBackBq', 'learnIm', 'watchSent',
     'earlyWave', 'outageComms', 'trackOutcomes', 'relay', 'noWait', 'postBurson', 'draftFollowUps', 'draftAnswers', 'safetyValve',
     'directB25', 'proactiveWatch', 'tempChecks', 'bsgTestEmails', 'fastTriage', 'fastTriageRank', 'fastTriageHold', 'earlyWaveBq',
-    'edAmie', 'edBwLive', 'watchAmie', 'openEngine', 'liveDashboard', 'slideDeliveries'];
-  const ROWS = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 27, 28, 29, 32, 34, 36, 37, 38, 39, 40, 46, 48, 49, 50, 51, 54, 55];  // rows 25-26 the space cells, 30-31 B30 / B31, 33 B33, 35 B35, 41-45 and 47 bars, 52-53 left to people
+    'edAmie', 'edBwLive', 'watchAmie', 'openEngine', 'liveDashboard', 'slideDeliveries', 'speedHonest'];
+  const ROWS = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 27, 28, 29, 32, 34, 36, 37, 38, 39, 40, 46, 48, 49, 50, 51, 54, 55, 56];  // rows 25-26 the space cells, 30-31 B30 / B31, 33 B33, 35 B35, 41-45 and 47 bars, 52-53 left to people
   const rows = (t, col) => ROWS.map(r => t.control().cell(r, col));
   const allOff = () => Object.fromEntries(KEYS.map(k => [k, false]));
   const VALVE = KEYS.indexOf('safetyValve');
 
-  test('switches: a new Control tab has all 31, each an ON / OFF dropdown set to OFF, with what OFF means in column C; rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54 and 55 are the switches, row 25 the S-F Burson space (blank), row 26 the Burson test copy (blank), row 30 Testing: send to (blank), row 31 the BigQuery lookback (60 minutes, its own dropdown), row 33 the Other alerts space (blank, no dropdown), row 35 Watch alerts (OFF, its own dropdown), rows 41-45 and 47 the fast-triage and early-watch bars, rows 52-53 blank, row 56 blank, and "How it works" follows from row 57', () => {
+  test('switches: a new Control tab has all 32, each an ON / OFF dropdown set to OFF, with what OFF means in column C; rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54, 55 and 56 are the switches, row 25 the S-F Burson space (blank), row 26 the Burson test copy (blank), row 30 Testing: send to (blank), row 31 the BigQuery lookback (60 minutes, its own dropdown), row 33 the Other alerts space (blank, no dropdown), row 35 Watch alerts (OFF, its own dropdown), rows 41-45 and 47 the fast-triage and early-watch bars, rows 52-53 blank, and "How it works" follows from row 57', () => {
     const t = e2e();
     t.bot.setup();
     eq(B.switchRows_(), ROWS);
@@ -40,7 +40,7 @@ module.exports = H => {
       'Early watch: about_google and brand_risk, each at or above', 'Early watch: distinct accounts, at least',
       'Write early-wave records to BigQuery', 'Early watch: independent_reports at or above', 'Early Detection: also read the AMIE table',
       'Early Detection: also read Brandwatch live (not X)', 'Proactive watch: also read the AMIE table', 'Open engine: judgment in place of caps', '', '',
-      'Live dashboard', 'Slide deliveries', '', 'How it works']);
+      'Live dashboard', 'Slide deliveries', 'Speed numbers: leave out when the bot was not running', 'How it works']);  // row 56 is a switch now
     eq([t.control().validations['25,2'], t.control().validations['26,2'], t.control().validations['33,2']], [undefined, undefined, undefined]);  // a space goes there
     // B31 is no switch: 60 minutes, with its own 15 / 30 / 45 / 60 minutes dropdown
     eq([t.control().cell(31, 2), t.control().validations['31,2'].values], ['60 minutes', ['15 minutes', '30 minutes', '45 minutes', '60 minutes']]);
@@ -78,7 +78,7 @@ module.exports = H => {
       'Early watch: about_google and brand_risk, each at or above', 'Early watch: distinct accounts, at least',
       'Write early-wave records to BigQuery', 'Early watch: independent_reports at or above', 'Early Detection: also read the AMIE table',
       'Early Detection: also read Brandwatch live (not X)', 'Proactive watch: also read the AMIE table', 'Open engine: judgment in place of caps', '', '',
-      'Live dashboard', 'Slide deliveries', '', 'How it works']);
+      'Live dashboard', 'Slide deliveries', 'Speed numbers: leave out when the bot was not running', 'How it works']);  // row 56 is a switch now
     // the BigQuery lookback row comes in too: 60 minutes, with its dropdown (the tab had only B2's)
     eq([sh.cell(31, 2), sh.validations['31,2'].values], ['60 minutes', ['15 minutes', '30 minutes', '45 minutes', '60 minutes']]);
     eq([sh.cell(25, 2), t.bot.readControl_(sh).sfBurson, sh.cell(26, 2), t.bot.readControl_(sh).testCopy], ['', '', '', '']);

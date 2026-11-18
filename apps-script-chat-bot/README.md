@@ -55,8 +55,8 @@ sheet, and its link is in the bot's first message in the analyst space. You don'
 | **Today** (B7) | Alerts reviewed, alerts sent back to Burson, questions answered. While the bot works alone in the Auto-correct space (B10 set, B9 blank, B3 or B4 blank): that space's own count, the one C10 shows | The bot |
 | **Runs as** (B8) | The account the bot posts as. It must be a member of both spaces | `setup()` |
 | **Mirror space**, **Auto-correct space** (B9, B10) | Optional test spaces (below) | You |
-| **The switches** (B11:B24, B27:B29, B32, B34, B36:B40, B46, B48:B51, B54:B55) | `ON` or `OFF`, all OFF to start: what the bot may do on its own (below) | You |
-| C11:C24, C27:C29, C32, C34, C36:C40, C46, C48:C51, C54:C55 | What each switch does when OFF, or what it is doing when ON (C54: the live dashboard's link, once it is deployed) | The bot, every minute |
+| **The switches** (B11:B24, B27:B29, B32, B34, B36:B40, B46, B48:B51, B54:B56) | `ON` or `OFF`, all OFF to start: what the bot may do on its own (below) | You |
+| C11:C24, C27:C29, C32, C34, C36:C40, C46, C48:C51, C54:C56 | What each switch does when OFF, or what it is doing when ON (C54: the live dashboard's link, once it is deployed; C56: since when the bot keeps its run log, and what the last listing of Burson's alerts posted while it was OFF found) | The bot, every minute |
 | **S-F Burson space** (B25) | Which space is the real Burson space, S-F Burson: its link, id or exact name. Only this cell decides it; the code never names it. Blank to start (see "S-F Burson space (B25)" below) | You |
 | C25 | ✓ and the name of the space the bot found, ✗ and what to fix, or ⚠️ Not set and what waits for it | The bot |
 | **Burson test copy** (B26) | Optional. A Google-only space to practise the Relay in without touching S-F Burson: the bot copies S-F Burson there, and while it's set the Relay sends the analysts' side (and, with row 24 ON, the bot's own Burson replies and emojis) there instead of S-F Burson. Blank to start (see "Practising the Relay with a Burson test copy" below) | You |
@@ -67,11 +67,13 @@ sheet, and its link is in the bot's first message in the analyst space. You don'
 | **Other alerts space** (B33) | Optional. A Google-only space with other alerts (a campaign space, say) the bot works every minute beside the Mirror space, always in Testing (see "Other alerts space (B33)" below). C33 shows how it's doing | You |
 | **Fast triage bars** (B41:B45, B47) | The six hold-back and early-watch bars for rows 39 and 40 (seeds `0.10`, `0.90`, `0.55`, `0.80`, `3`, and `0.30` in B47; blank or invalid uses its seed). Column C shows what the bot is using | You |
 | Rows 52-53 | Left as they are: blank, or your own notes. The bot never writes there (it only clears its own old help text from column A: the help was at row 53 before rows 54 and 55 were switches) | You |
-| **How it works** (from A57; row 56 is blank) | A plain-language guide to all of the above | `setup()` and the bot |
+| **How it works** (from A57, right under row 56, the last switch) | A plain-language guide to all of the above | `setup()` and the bot |
 | **Watches**, **Watch detections** and **Watch sources** tabs | Only with Proactive watch ON (row 34): what to look for (one watch a row, each ON / OFF), what the watches would have flagged (with its source and a scorecard against Burson's alerts), and which sources are live, stale or failing (see "Proactive watch (row 34)" below) | You edit the watches and rate the rows; the bot writes the rest |
 | **Follow-up** tab | Only with Track post-alert outcomes ON (row 21): what came of the bot's Social Alerts, which teams replied, each alert's status and next step, and editable P0/P1/P2 reply deadlines in B5:B7 | The bot updates it; you can edit B5:B7 |
 | **Burson outbox** tab | Only with Post in S-F Burson ON (row 24) while LIVE: what the bot or the Relay would post in S-F Burson, each row waiting for you to set it to Send or Skip | The bot adds rows; you set Status |
 | **Early Detection** tab | Only with Early wave & velocity check ON (row 19): every story it found and what became of each, one row each (see "The Early Detection tab" below) | The bot writes it; you can sort its rows |
+| **When the bot ran** tab | Only with Speed numbers: leave out when the bot was not running ON (row 56): when the bot was running, paused (Bot OFF), failing or not running at all, from the moment row 56 was turned ON (see "When the bot ran (Control row 56)" below) | The bot |
+| **Burson while bot OFF** tab | Only with row 56 ON: the Burson alerts posted while Bot (B2) was OFF, listed when Bot was set back ON; never reviewed, posted or emailed | The bot |
 
 **To change a space**, open the space in Google Chat, copy the address bar, and paste it into B3, B4, B25 or B26. The
 space's exact name also works. Within a minute, column C shows the space the bot found.
@@ -687,9 +689,9 @@ The thread only gets a short note: `🌡️ Temp check sent: @asker (10/29) 2020
   OFF (as it starts), nothing changes: such a message is an analyst's message like any other.
 - C36 says how the last one went.
 
-### The switches: what the bot may do on its own (rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54-55)
+### The switches: what the bot may do on its own (rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54-56)
 
-Rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54 and 55 are ON / OFF switches (a dropdown in column B). Each starts **OFF**, and with every switch OFF the bot works
+Rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54, 55 and 56 are ON / OFF switches (a dropdown in column B). Each starts **OFF**, and with every switch OFF the bot works
 exactly as the rest of this README describes (in S-F Burson itself, it posts nothing: row 24). Column C says what OFF
 means, or what an ON switch is doing (its counts today and its last check). The bot rewrites column C every run, paused
 or not.
@@ -724,16 +726,17 @@ or not.
 | 48 | Early Detection: also read the AMIE table | Early Detection does not read the AMIE table | Needs row 19 ON (C48 says it is waiting while row 19 is OFF). Each Early Detection check also reads the new rows of the AMIE table (Brandwatch's alert feeds, X posts with their words) with a BigQuery job of its own, read only, with no call to Brandwatch: from an hour before the newest row it last took (to catch rows that land late), at most 300 new rows a check (`amie_rows_per_check`), small accounts only, not positive, English, Google's posts, never the staff and KOF feeds or a post the alert memory already has. It checks the table at the end of a check, after the other sources were read, so a slow answer never holds them up: its columns every hour and a dry run once a day (at most 1 GB a read, `amie_max_gb`). So its first read comes at the check after the row goes ON (about 15 minutes later). A missing column, refused access or a read too big stops it for the day; a failed read pauses it an hour; either way the other sources go on. Turning it OFF forgets where it had read to (the day's counts and the day it was first read stay) |
 | 49 | Early Detection: also read Brandwatch live (not X) | Early Detection does not call Brandwatch | Needs row 19 ON (C49 says it is waiting while row 19 is OFF). The New sources tab then lists the Brandwatch project's queries, each with Read `OFF` (the bot never sets one `ON`): set Read to `ON` for the ones to read (at most 20, the first by row; C49 waits until one is ticked). After each run's alerts and the Watch (row 34), never before them, and at most every 10 minutes (`bw_live_every_minutes`), it asks Brandwatch's API, with GETs only, for the mentions of the ticked queries added since it last read (with 5 minutes of overlap, oldest first, at most 300 a read: `bw_live_parcel_max`), never X and never LinkedIn. Early Detection's next check takes them in a BigQuery job of its own, the mentions sent as a parameter (never in the SQL), through the same rules as its other sources (English, not positive, Google's, small accounts); a mention added more than 3 hours after it was posted can only join a story. It keeps to 20 calls in 10 minutes of its own (`bw_live_calls_per_10min`) and waits 10 minutes when Brandwatch's shared login has used 450 of its 600 calls (`bw_live_pause_at_used`) or says too many calls; Brandwatch refusing the key or the read, or not answering, is said in C49 with since when. An X mention, or Brandwatch ignoring "added since" or the order asked for, stops it until the row is turned OFF and ON again. While it reads (its last read under an hour old), the AMIE table (row 48) leaves Brandwatch's networks to it. A job that fails twice drops its mentions, and C49 says how many. The day's mentions are counted (C49 and the New sources tab) but not capped. While rows 49 and 19 are ON the bot also counts every Brandwatch mention it reads, whatever reads it (this reader, the Watch's Brandwatch query, Temp checks): C49 then says `the bot read 41,200 Brandwatch mentions today, all features` (when the Watch or Temp checks read some), and the tab and the log line give the same number; until the count has run over midnight Eastern it says `since this row went ON` instead of `today`. That count stops when row 49 goes OFF or waits for row 19, and never changes what the Watch or Temp checks ask Brandwatch or what they get. Turning it OFF forgets where it had read to (the day's counts and the ticks stay); ON again starts from the last 30 minutes (`bw_live_first_minutes`) |
 | 50 | Proactive watch: also read the AMIE table | The Watch does not read the AMIE table | Needs row 34 ON (C50 says it is waiting while row 34 is OFF). The Watch also checks the new rows of the AMIE table (Brandwatch's alert feeds, X posts with their words) in its US look, and while row 50 is ON every post an Early Detection story card links counts as that card's, as its main post does (see "Every post of a story card"). Its flags go only where Watch alerts (row 35) send them |
-| 51 | Open engine: judgment in place of caps | Early Detection, the Watch and Direct BigQuery keep today's limits. C51 also shows the run time of the last 24 hours and Burson's pick-up time (p90), once a minute of run time is recorded | Needs row 19 ON (C51 says it is waiting while row 19 is OFF). Built so far (step S2 of the open-engine plan): **one safety stop a day**: 2,000 background reviews an Eastern day (`open_daily_stop`; story reviews, Watch pre-reads, the Other alerts space's triages), and from the same number 20,000 quick looks, 200,000 Watch post checks and 3,000 GB of background BigQuery reads. Past it no new story review, Watch card or Direct BigQuery card starts until midnight ET (quick looks go on to their own ceiling), C51 says so first and C19 ends `safety stop reached`. **The day's run time and outside calls guarded**: from 80% of the last 24 hours' run-time budget only serious work starts (P0 / P1, a KOF, a 2,000+ post), from 90% no background reviews or cards, from 97% no background work at all; from 70% of the outside-call budget no quick looks, from 90% no background work. **Burson first**: before each background review or card the bot looks at S-F Burson; a new alert there ends background work for the run, and the next run takes it first. While the day's Burson pick-up p90 is over 2 minutes, each run keeps 30 to 60 seconds more for Burson. After a Gemini "too busy", background work waits 10 minutes; ApiGuard's rolling limits become a runaway guard only (Gemini 120 / 500, BigQuery 150 / 700, Gemini Decisions 600 / 2,400 in 10 / 60 minutes); a web search refused during background work is turned off for background work only. Burson's own alerts are never counted, slowed or stopped. In the Auto-correct space the bot's own Watch alerts and Direct BigQuery cards waiting for their review are the bot's own backlog: they no longer make the flow look busy (so Early Detection keeps checking), an ordinary one waits while a serious story is next in the review queue or a due check needs the rest of the run, and the Watch posts a new card there only while fewer than 3 of them wait. Early Detection checks every 5 minutes (`open_check_minutes`; every 10 from 60% of the day's run-time budget, every 15 from 70%; Gemini Decisions' pause after a failure follows it). Its review allowance (5 a check, the hour's 10 and 6 ordinary, the day's 150) no longer turns stories away: every signal not yet ended in the producer's 180 minutes is read (up to 300), serious ones go first, the queue holds 24 (`open_queue_max`; a serious one may take up to 4 places more, so an ordinary one is not pushed out for it), a story that does not fit waits for a later check and ends only when it would leave the 180 minutes (`it waited 3 hours while N more serious stories were reviewed first`), and the reviews have no count a run (the run's time bounds them). Each check embeds every post it has time for (80 texts a call, no count of 400 a check or 20,000 a day), a source's read returns up to 5,000 posts, and a check hands over up to 50 signals of a kind. Every source has the same standing (`open_equal_lanes`): a post of any source read within 3 hours of posting (`open_fresh_minutes`) may start a story, Tubular's and Brandwatch's nightly ones too, and a later one only joins; a story's review gets one line when most of its posts come from a source whose same-story grouping has not been checked yet (`open_lane_bars`, or the property `OPEN_LANE_BARS` step S1 writes, say which have been). Gemini Decisions' quick looks have no count a check or a day (the day's quick-look ceiling bounds them) and a check's candidates go side by side in one batch; a blank B45 reads 2 accounts; a story is raised early when about Google and brand risk reach the watch bar and medium-or-worse severity the confidence bar, or its P0 share is 0.35 or more; a signal most likely about nothing (severity none at `open_hold_none_at`, 0.80) is held back. Every post a check reads is checked against the alert requirements code can decide (`open_requirements_first`; a KOF on a list, 2,000+ engagements, the source's own P0 tag or Sensitive Topic, Google's own post at 30 comments and 30% negative) and counted on the Engine tab; the posts it leaves to a judgment get a quick look of their own at the end of the Auto-correct flow's run (one call a post, side by side, within 20 seconds; the post's words only, no link, handle or numbers), counted at four bars; nothing is posted or queued because of either yet; an alert in another format (the Watch's cards, the Other alerts space) with a Sensitive Topic counts as collected whatever its engagements. In the Auto-correct space a Watch flag the AI pre-read judged meaningful with a P1 tag or a Sensitive Topic goes out alone, whatever its reach (no pre-read: as before); when flags have waited 10 minutes for their pre-read for want of time, the flow's background steps stop at 210 s (Burson's own alerts keep their time) so the Watch can read them; Brandwatch mentions' 1,000 a day goes (60 a look stays). Direct BigQuery reads every source at each check, 50 candidates a source, ranks them across sources (a KOF's post first, then the most engagements) and posts while fewer than 3 of its cards wait unreviewed, instead of 2 a check (its 500 engagements stay); a candidate not posted comes back at the next check. A story already carded that grows 1.5 times and 3 more accounts (short of the update bar) gets a growth note in its card's thread ("Growing: 14 accounts now, up from 9" and up to 3 new links), with no review, while its newest post is under 3 hours old. Anyone in the Auto-correct space can write `why not <link>` and the bot answers in that thread from what it holds about the post (an alert or card already out, a Watch flag and what came of it, the story it joined or the pool it waits in, or that it holds nothing), read-only. In front of that quick look a first screen (`open_first_screen`) has Gemini (the triage model Burson's reviews use, through a sender of its own) read those posts 25 at a time with one known test post, and only the ones it marks as a possible P0 issue or Sensitive Topic (with 1 in 50 of the others, at random, and every post it could not read) get the quick look; a post in a P0 risk-term group or one whose words read like an instruction skips it. It steps aside for Burson (their pass catching up, their reviews bursting, a Gemini "too busy" to anyone in the last 10 minutes, a new Burson alert), pauses itself when Gemini is busy, slow or silent, and in a run where it cannot run every post gets its quick look as before; C51 warns after an hour of it paused. The new sources' caution rules go: no trial, no cap on stories only they lift, no share of the embeddings or the pool; Brandwatch live is read at every check and the AMIE table 5,000 rows a check (rows 48 and 49 still decide whether they are read at all). Velocity counts only posts the bot read within an hour of posting (`open_velocity_lag_minutes`), and a late post never changes an hour already counted (`open_velocity_fix`). C51 says the day's reviews, run time and calls against their budgets, and the walls met today (runs held by each) |
+| 51 | Open engine: judgment in place of caps | Early Detection, the Watch and Direct BigQuery keep today's limits. C51 also shows the run time of the last 24 hours and Burson's pick-up time (p90), once a minute of run time is recorded | Needs row 19 ON (C51 says it is waiting while row 19 is OFF). Built so far (step S2 of the open-engine plan): **one safety stop a day**: 2,000 background reviews an Eastern day (`open_daily_stop`; story reviews, Watch pre-reads, the Other alerts space's triages), and from the same number 20,000 quick looks, 200,000 Watch post checks and 3,000 GB of background BigQuery reads. Past it no new story review, Watch card or Direct BigQuery card starts until midnight ET (quick looks go on to their own ceiling), C51 says so first and C19 ends `safety stop reached`. **The day's run time and outside calls guarded**: from 80% of the last 24 hours' run-time budget only serious work starts (P0 / P1, a KOF, a 2,000+ post), from 90% no background reviews or cards, from 97% no background work at all; from 70% of the outside-call budget no quick looks, from 90% no background work. **Burson first**: before each background review or card the bot looks at S-F Burson; a new alert there ends background work for the run, and the next run takes it first. While the day's Burson pick-up p90 is over 2 minutes, each run keeps 30 to 60 seconds more for Burson. After a Gemini "too busy", background work waits 10 minutes; ApiGuard's rolling limits become a runaway guard only (Gemini 120 / 500, BigQuery 150 / 700, Gemini Decisions 600 / 2,400 in 10 / 60 minutes); a web search refused during background work is turned off for background work only. Burson's own alerts are never counted, slowed or stopped. In the Auto-correct space the bot's own Watch alerts and Direct BigQuery cards waiting for their review are the bot's own backlog: they no longer make the flow look busy (so Early Detection keeps checking), an ordinary one waits while a serious story is next in the review queue or a due check needs the rest of the run, and the Watch posts a new card there only while fewer than 3 of them wait. Early Detection checks every 5 minutes (`open_check_minutes`; every 10 from 60% of the day's run-time budget, every 15 from 70%; Gemini Decisions' pause after a failure follows it). Its review allowance (5 a check, the hour's 10 and 6 ordinary, the day's 150) no longer turns stories away: every signal not yet ended in the producer's 180 minutes is read (up to 300), serious ones go first, the queue holds 24 (`open_queue_max`; a serious one may take up to 4 places more, so an ordinary one is not pushed out for it), a story that does not fit waits for a later check and ends only when it would leave the 180 minutes (`it waited 3 hours while N more serious stories were reviewed first`), and the reviews have no count a run (the run's time bounds them). Each check embeds every post it has time for (80 texts a call, no count of 400 a check or 20,000 a day), a source's read returns up to 5,000 posts, and a check hands over up to 50 signals of a kind. Every source has the same standing (`open_equal_lanes`): a post of any source read within 3 hours of posting (`open_fresh_minutes`) may start a story, Tubular's and Brandwatch's nightly ones too, and a later one only joins; a story's review gets one line when most of its posts come from a source whose same-story grouping has not been checked yet (`open_lane_bars`, or the property `OPEN_LANE_BARS` step S1 writes, say which have been). Gemini Decisions' quick looks have no count a check or a day (the day's quick-look ceiling bounds them) and a check's candidates go side by side in one batch; a blank B45 reads 2 accounts; a story is raised early when about Google and brand risk reach the watch bar and medium-or-worse severity the confidence bar, or its P0 share is 0.35 or more; a signal most likely about nothing (severity none at `open_hold_none_at`, 0.80) is held back. Every post a check reads is checked against the alert requirements code can decide (`open_requirements_first`; a KOF on a list, 2,000+ engagements, the source's own P0 tag or Sensitive Topic, Google's own post at 30 comments and 30% negative) and counted on the Engine tab; the posts it leaves to a judgment get a quick look of their own at the end of the Auto-correct flow's run (one call a post, side by side, within 20 seconds; the post's words only, no link, handle or numbers), counted at four bars; nothing is posted or queued because of either yet; an alert in another format (the Watch's cards, the Other alerts space) with a Sensitive Topic counts as collected whatever its engagements. In the Auto-correct space a Watch flag the AI pre-read judged meaningful with a P1 tag or a Sensitive Topic goes out alone, whatever its reach (no pre-read: as before); when flags have waited 10 minutes for their pre-read for want of time, the flow's background steps stop at 210 s (Burson's own alerts keep their time) so the Watch can read them; Brandwatch mentions' 1,000 a day goes (60 a look stays). Direct BigQuery reads every source at each check, 50 candidates a source, ranks them across sources (a KOF's post first, then the most engagements) and posts while fewer than 3 of its cards wait unreviewed, instead of 2 a check (its 500 engagements stay); a candidate not posted comes back at the next check. A story already carded that grows 1.5 times and 3 more accounts (short of the update bar) gets a growth note in its card's thread ("Growing: 14 accounts now, up from 9" and up to 3 new links), with no review, while its newest post is under 3 hours old. Anyone in the Auto-correct space can write `why not <link>` and the bot answers in that thread from what it holds about the post (an alert or card already out, a Watch flag and what came of it, the story it joined or the pool it waits in, or that it holds nothing), read-only. In front of that quick look a first screen (`open_first_screen`) has Gemini (the triage model Burson's reviews use, through a sender of its own) read those posts 25 at a time with one known test post, and only the ones it marks as a possible P0 issue or Sensitive Topic (with 1 in 50 of the others, at random, and every post it could not read) get the quick look; a post in a P0 risk-term group or one whose words read like an instruction skips it. It steps aside for Burson (their pass catching up, their reviews bursting, a Gemini "too busy" to anyone in the last 10 minutes, a new Burson alert), pauses itself when Gemini is busy, slow or silent, and in a run where it cannot run every post gets its quick look as before; C51 warns after an hour of it paused. The new sources' caution rules go: no trial, no cap on stories only they lift, no share of the embeddings or the pool; Brandwatch live is read at every check and the AMIE table 5,000 rows a check (rows 48 and 49 still decide whether they are read at all). Velocity counts only posts the bot read within an hour of posting (`open_velocity_lag_minutes`), and a late post never changes an hour already counted (`open_velocity_fix`). C51 says the day's reviews, run time and calls against their budgets, and the walls met today (runs held by each). With row 56 ON as well, the dashboard also shows the pick-up time leaving out the alerts posted before the bot came back after a stop, a pause or failing runs, under the usual one; C51, the Engine tab and the 30 to 60 seconds kept for Burson still count every pick-up, as before |
 | 54 | Live dashboard | The live dashboard web app shows nothing; the bot keeps no extra records for it | The live dashboard web app (see "Live dashboard" below) shows the bot's work to the people this sheet is shared with, read-only: what needs a person now, the stories forming, the alerts and where each stands, what is stuck or held back, and how current it all is. It never posts, sends or changes anything. While it's ON the bot also keeps, for each Early Detection story card it posts, the story's posts in order, and each run writes the dashboard's build id (the script property `BOT_BUILD`) when it changed. C54 has the web app's link once it is deployed, or says it is not deployed yet |
 | 55 | Slide deliveries | No pulse slides are delivered; deliveries can be set up in the web app and wait | Each delivery set up in the web app (see "Slide deliveries" below) is delivered on its own schedule: the run keeps one time trigger (`dashDeliverDue`, every 5 minutes) while row 55 is ON and removes it when it's OFF. C55 says it is waiting until the bot's account approves editing Google Slides once, or that nothing is delivered while the bot is paused (B2 OFF). While it's ON each run also records whether the bot is LIVE or Testing (the script property `SLIDE_MODE_LOG`, written only when that changes, and once when row 55 is turned OFF, so the time it was OFF reads "not recorded"), so a slide can say whether a Social Alert went to the teams or only to the testers |
+| 56 | Speed numbers: leave out when the bot was not running | The bot keeps no record of when it was running, and the speed numbers count every alert as they always have | From the moment you turn it ON, the bot keeps a "When the bot ran" tab: when it was running, paused (Bot OFF), failing, or not running at all. When Bot (B2) is set back ON after a pause, it lists the Burson alerts posted while it was OFF on a "Burson while bot OFF" tab, without reviewing, posting or emailing any of them. The Results and Head start tabs then show extra speed numbers next to the usual ones, which don't change, and so does the dashboard (see "When the bot ran (Control row 56)" below). C56 says since when the run log is kept, and what the last listing found |
 
 What holds for every switch:
 
 - **ON only when it says so.** A switch is ON only when its row has the switch's own label and column B says ON. The
   bot never sets a switch ON: a row whose label is missing or changed is put back OFF. A Control tab from before the
-  switches gets rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54 and 55 on the next run (no need to run `setup()`), all OFF, rows 41-45 and 47 set to their seed bars (`0.10`, `0.90`, `0.55`, `0.80`, `3`, `0.30`), row 25 (S-F Burson space) blank, row 26 (Burson test copy) blank, row 33 (Other alerts space) blank and row 35 (Watch alerts) OFF.
-  The values in B2:B10, B25:B26, B30:B31, B33, B35, B41:B45, B47, and any switch someone already set, are kept, and "How it works" moves to row 57 (rows 52-53 are left as they are, and row 56 is blank: only the bot's own old help is cleared from column A there, such as the old "How it works" title at A53, and anything else a person wrote in rows 52-53 stays, in any column, a line of their own that starts with "•" too; a person's text in column A of the rows the help now fills, rows 57-109, is kept below the help, in the first blank cells of column A, unchanged, and the log says where it went). A switch row the bot adds is written in full, label, `OFF` and column C, over whatever its cells A:C held: on a tab from before rows 54 and 55 those are two of the old help's lines (on a tab from the first build, rows 48-51 too: the blank row above its help, the help's title and its first lines), and a person's text in A54:C55 (any column, but a stray `ON`: the new switch always starts `OFF`) is kept below the help, in the first blank cells of column A, unchanged, with a log line that says which cell it came from and where it went (on a tab from the first build, a person's text in A48:C51 is replaced, as it always was); rows 52 and 53 are never taken. One exception, once: the confidence bar (B43) still at `0.80`, the seed the first build wrote there, moves to `0.55`; any other value in B43 is kept.
+  switches gets rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54, 55 and 56 on the next run (no need to run `setup()`), all OFF, rows 41-45 and 47 set to their seed bars (`0.10`, `0.90`, `0.55`, `0.80`, `3`, `0.30`), row 25 (S-F Burson space) blank, row 26 (Burson test copy) blank, row 33 (Other alerts space) blank and row 35 (Watch alerts) OFF.
+  The values in B2:B10, B25:B26, B30:B31, B33, B35, B41:B45, B47, and any switch someone already set, are kept, and "How it works" moves to row 57 (rows 52-53 are left as they are, and row 56, once the blank row above the help, is a switch now: only the bot's own old help is cleared from column A there, such as the old "How it works" title at A53, and anything else a person wrote in rows 52-53 stays, in any column, a line of their own that starts with "•" too; a person's text in column A of the rows the help now fills, rows 57-110, is kept below the help, in the first blank cells of column A, unchanged, and the log says where it went). A switch row the bot adds is written in full, label, `OFF` and column C, over whatever its cells A:C held: on a tab from before rows 54 and 55 those are two of the old help's lines (on a tab from the first build, rows 48-51 too: the blank row above its help, the help's title and its first lines), and a person's text in A54:C56 (any column, but a stray `ON`: the new switch always starts `OFF`) is kept below the help, in the first blank cells of column A, unchanged, with a log line that says which cell it came from and where it went (on a tab from the first build, a person's text in A48:C51 is replaced, as it always was); rows 52 and 53 are never taken. One exception, once: the confidence bar (B43) still at `0.80`, the seed the first build wrote there, moves to `0.55`; any other value in B43 is kept.
 - **Testing vs. LIVE is decided on the Control tab every run (`Main.gs` `runMode_`).**
   - The run is **LIVE** only when **Safety valve (row 29)** and **Group test emails (row 37)** are `OFF`, **Burson test copy (B26)** is blank, and **S-F Burson (B25)** is set and found (with alerts coming from S-F Burson via B3 or Mirror B9). While LIVE, Status (B5) starts with the LIVE badge, emails/drafts use real `Brand safety groups` recipients, the real T&S form is used, leads receive DMs, SLRR BigQuery write-back (row 16) writes to the shared tables, and the **Burson outbox** can send rows marked `Send` to S-F Burson.
   - Everything else (Safety valve `ON`, or Group test emails `ON`, or B26 set even if failing checks, or B25 blank/not found, or row 32 working directly in a Google-only B25) is **Testing** (fail closed): every email or draft goes only to the email addresses in `Control!B30` (`Testing: send to`; nothing is sent while `B30` is blank), except that with Group test emails `ON` each Social Alert goes to its group's test email in column C of `Brand safety groups` (a group with none is skipped and logged); only the test copy of the T&S form is submitted, and nothing is ever queued for or sent to live S-F Burson (any outbox row set to `Send` while in Testing is reset to `Pending` with a note). The **Auto-correct space (B10)** and the **Other alerts space (B33)** always stay in Testing even when the Mirror run is LIVE.
@@ -1420,6 +1423,37 @@ shows comes from what the bot keeps; what the bot doesn't keep, it says it doesn
   exact command that brings it up to date, its deployment id read from the link (step 4).
 - **How current it is.** "Updated 14 s ago" and every "3 min ago" are counted from the bot's own clock (each answer
   carries it), so a viewer's wrong device clock can't make the page look fresh or late.
+- **When the bot was running (Control row 56).** With row 56 ON ("Speed numbers: leave out when the bot was not
+  running"), the dashboard also shows what the bot's run log (the "When the bot ran" tab) says; OFF, none of this is
+  read or shown, and the dashboard is exactly as before:
+  - **The Now strip**, under the counts: "When the bot ran (last 7 days, from its run log):", then one line for each
+    stretch of the last 7 days when the bot was not running, paused (Bot OFF), failing or not known, newest first, in
+    the run log's own words and times (for example "The bot was not running from 2026-10-14 08:36 to 2026-10-15 02:37
+    ET."; a stretch still going says "(still going at its last run)"; at most 10, then "And N more stretches in the
+    last 7 days: see the "When the bot ran" tab."). With no such stretch: "It was running the whole time in the last 7
+    days." (or "since its run log started"). When the run log started within the 7 days: "Its run log starts <time>:
+    before then, not known." When no run is recorded for more than 10 minutes: "No run is recorded after <time> (more
+    than 10 minutes ago)." When its tab can't be read: "Not known: the "When the bot ran" tab could not be read
+    (<why>)." Before its first record: "Not known yet: its run log has no record. It starts at the bot's next run with
+    row 56 ON."
+  - **What this page can't see** gets one more item: "When the bot was running before <time>" (the run log starts
+    then; older speed numbers can't be checked against it), or "When the bot was running" when the run log has no
+    record yet, or when its tab can't be read (what to do: "Open the bot's sheet: the tab must keep the title the bot
+    wrote in A1.").
+  - **Caught early** shows the Head start tab's six new headline lines with the others, and under each story's head
+    start its "Speed check: …" (the tab's "Speed check: was the bot running?" cell, for example "Speed check: not
+    comparable: the bot was not running from … to … ET"). Until the Head start tab is next rebuilt (every 10 minutes)
+    it says: "The Head start tab has no "Speed check: was the bot running?" column yet: the bot adds it at its next
+    rebuild (every 10 minutes)."
+  - **An alert's timeline** (the panel that opens on an alert): Burson's alert that waited more than 10 minutes from
+    reaching the space to the bot picking it up gets one more line right after "The bot picked it up": "It waited <n>
+    min for the bot to run", followed, when the run log knows why, by its words (for example ": the bot was not running
+    from … to … ET", or ": not known: before the bot kept its run log (… ET)").
+  - **Pressure, "How hard the bot is working"** (row 51 ON): "Pick-up time" is as before (every pick-up of the day).
+    Under it, one more line: "Leaving out alerts posted before the bot came back after a stop, a pause or failing runs
+    (row 56): 90% within 62 s (14 alerts since 9:14 AM)", the same pick-ups without the ones that only waited for the
+    bot to run, kept from the first run row 56 was ON that day ("none counted yet today" before the first one). While
+    the run log has no record yet or can't be read, that line says it is not known, and why.
 
 Deploy it (from the repository's `apps-script-chat-bot/` folder):
 
@@ -1506,6 +1540,84 @@ in the web app's Slide deliveries area; the bot builds and places the slides.
 - **Where deliveries are kept.** The bot's own `Slide deliveries` tab (its title in A1 marks it as the bot's). A tab of
   that name the bot didn't make is left alone, and the web app says so.
 
+## When the bot ran (Control row 56): the run log, and Burson's alerts posted while it was OFF
+
+**Why.** Every speed number on the Results and Head start tabs counts from the time Burson posted the alert. When the
+bot was not running for a while (the every-minute trigger stopped, it waited for a permission after an update, its runs
+kept failing, or Bot was OFF), the alerts Burson posted meanwhile waited for it, and that wait counted as the bot's own
+minutes: the Results tab's "Typical minutes from Burson's post to the email (median): the bot" jumps after such a
+stretch, and falls again as those alerts leave the 24-hour and 7-day windows. And the alerts Burson posted while Bot was
+OFF were skipped for good, so a Head start story could read "No Burson alert found" or a head start it never had. Row 56
+lets the bot keep a record of when it was running, so the new speed numbers can leave that time out.
+
+**Kept only from the moment you turn row 56 ON.** Before then the bot kept no record of when it was running, so nothing
+older can be corrected: those alerts are counted as "not known", never guessed. The numbers you see today stay as they
+are; the new ones are shown next to them, each with its own label.
+
+**Control row 56, OFF to start.** Only a person turns it ON; the bot only ever writes OFF there. With it OFF the bot
+reads and writes nothing for it, and every tab is exactly as it was. Turned OFF later, the two tabs below stay as they
+are (nothing more is added to them); turned ON again, the time it was OFF reads "Not known".
+
+**The "When the bot ran" tab** (made by the bot the first time row 56 is ON, at the end of the sheet, protected with a
+warning). One row for each stretch of time, oldest at the top:
+
+| What the bot was doing | From | To |
+|---|---|---|
+| Running | the start of the first run | the end of the last run |
+| Paused: Bot (B2) was OFF | the start of the first run with Bot OFF | the start of the first run with Bot ON again: no run is made in between, and the last one found Bot OFF (when you set B2 back ON is not recorded). After more than 10 minutes with no run, the end of the last paused run, and a "Not running" row follows |
+| Failing: its runs stopped with an error | the start of the first run that failed (Details has the error, as B5 showed it), or the start of a run that Apps Script stopped part way (Details: "the run that started at … ET ended without finishing (Apps Script stopped it)"), also when that was the first run after a stop | the end of the last failed run, or the start of the run that found it |
+| Not running: no run was recorded | the end of the last run | the start of the next run, when more than 10 minutes passed with no run (the same 10 minutes after which B6 "Last check" means the bot has stopped) |
+| Not known | the end of the last run before row 56 was turned OFF (or before the tab could not be written) | the start of the first run after it was turned ON again |
+
+Every time on the tab is one a run recorded (its own start, or the end of its run); none is estimated. Before the
+tab's first row, when the bot was running is **not known**. The last row's "To" says "still going" until the bot does
+something else. A run that stopped with an error counts as failing at once, also for the Results and Head start tabs it
+rebuilds at its end. The hidden columns E-H are for the bot. A run that finds the run before still going does nothing
+and records nothing (the run before covers that time). The tab keeps the last 60 days, and at most 20,000 rows (the
+oldest 1,000 go first); A2 then says how far back it reaches.
+
+**Burson's alerts posted while the bot was OFF.** When Bot (B2) is set back ON after a pause that the run log
+recorded, the bot reads the Burson spaces its flows read (the Burson space B3, or S-F Burson B25 when the Mirror or
+the Auto-correct space reads it; never the Mirror space, the Other alerts space B33 or the Burson test copy B26) from
+the start of the last run before the pause to the first run after it, and lists every Burson alert posted there on
+the **"Burson while bot OFF"** tab: when Burson posted it, its issue, its link, product and exposure tag, the space,
+and the pause it fell in ("While the bot was OFF (ET)"). It only reads: nothing is reviewed, posted, reacted to or
+emailed, and no flow's place in the space moves. It reads a page or two each run (after everything else, never while
+an alert is waiting), and at most 10,000 messages per space per pause (the paused row then says from when it stopped).
+The paused row on "When the bot ran" says how many were listed. These alerts then count as "posted while the bot was
+OFF" on the Results and Head start tabs, instead of going missing.
+
+- **Only the alerts posted during the pause count as posted while the bot was OFF.** The list starts at the start of
+  the last run before the pause, which may not have read what Burson posted after it started, so an alert posted
+  shortly before Bot was set OFF is listed too. Its "While the bot was OFF (ET)" cell then says "Not while OFF: …" and
+  what the bot was doing when it was posted, for example "Not while OFF: posted while the bot's runs were failing,
+  before Bot was set OFF (2026-11-18 08:08 ET)" (such an alert may have been reviewed then). It is never counted as
+  posted while the bot was OFF. Only an alert whose cell gives the pause's own times is.
+- The post key is the one in the alert as Burson wrote it: if the bot would have corrected the link, a listed alert can
+  miss its match. The tab keeps 60 days and at most 5,000 rows.
+
+**What to look at.**
+
+1. The "When the bot ran" tab: every "Not running", "Paused" or "Failing" row is time the new speed numbers leave out.
+   A "Not running" row you didn't expect (a stopped trigger, a wait for a permission after an update) is worth a look
+   at the Apps Script Executions list for that time.
+2. On the Results tab, compare the usual "Typical minutes from Burson's post to the email (median): the bot" with the
+   first line under SPEED WHILE THE BOT WAS RUNNING. A big gap between the two means alerts waited for the bot to run;
+   "Alerts left out" says how many.
+3. On the Head start tab, the "Speed check: was the bot running?" column says for each story whether its race counts,
+   and why not.
+4. The "Burson while bot OFF" tab: the alerts the bot never reviewed because Bot was OFF. Nothing was emailed for them
+   by the bot.
+
+**A tab of yours with one of these names** is never written: the bot does nothing for it and C56 says to rename it;
+once it is renamed, the bot makes its own (the time in between is "Not known").
+
+**What it keeps.** The script properties `RUN_LOG_OPEN` (where the run log stands: the stretch still going and its
+last recorded end; written only with row 56 ON, once a run) and `RUN_LOG_OFF_TODO` (pauses waiting to be listed, at
+most 5); and, with row 56 ON, a second list of the day's pick-up times in `RUN_LEDGER` (`pc`, without the alerts that
+waited for the bot to run). Turning row 56 OFF leaves the two `RUN_LOG_…` properties as they are, and the next run
+drops that second list.
+
 ## One-time setup (whoever installs it)
 
 1. The Apps Script project (`.clasp.json`) must use the Cloud project `brand-social-central-data` (**Project
@@ -1576,6 +1688,8 @@ From top to bottom:
   only Burson could add (e.g. a missing link), Social Alerts sent by the bot and by the IMs, how often they made the
   same call, the alerts only one of them sent, minutes from Burson's post to each side's email, who sent first and by
   how much, and the T&S forms the bot prepared.
+- **Speed while the bot was running** (only with Control row 56 ON, "Speed numbers: leave out when the bot was not
+  running"; see below). OFF, this section is not there and the tab is exactly as before.
 - **What Burson got wrong**, by field (Product, Exposure Tag, Summary rewritten, Link missing, …), with an example.
 - **The two test spaces** side by side: the Mirror space (the bot asks Burson to fix) and the auto-correct space (the
   bot fixes it itself), and any alert where they made a different Social Alert call.
@@ -1594,13 +1708,53 @@ The tab updates right after a run that handled an alert or sent an email (at mos
 otherwise. Run `refreshResults()` to rebuild it now (`refreshSpeed()` still works). Settings: `speed_tab`,
 `speed_days`, `speed_im_table`, `speed_log_table`, `speed_im_sender`, `speed_gmail`.
 
+### Speed while the bot was running (Control row 56)
+
+**Why.** The speed lines of **Headline numbers** count from when Burson posted each alert. When the bot was not running
+for a while, the alerts Burson posted meanwhile waited for it, and that wait counted as the bot's own minutes (see
+"When the bot ran (Control row 56)" above).
+
+**What you see.** With row 56 ON, a section right under **Headline numbers** (whose lines do not change), for the last
+24 hours and the last 7 days:
+
+| Line | What it counts |
+|---|---|
+| `SPEED WHILE THE BOT WAS RUNNING (Control row 56: leaves out the times it was not running)` | the section's title |
+| `Typical minutes from Burson's post to the email (median): the bot, only the alerts it was running for the whole time (see the note below)` | the same minutes as the usual line, over the same alerts (both the bot and the IMs sent a Social Alert, both times known), but only those where the bot was running the whole time from Burson's post until its email was ready |
+| `Typical minutes the alert waited for the bot to run (median): from Burson's post to the bot picking it up` | from Burson's post to the time the bot picked the alert up (recorded on its Alert-log row as `seen_at`); only alerts with that time recorded |
+| `Typical minutes the bot waited for Burson to resend an alert it asked Burson to fix (median): from picking up Burson's alert to picking up the resend` | only for an alert the bot asked Burson to fix and resend: from the bot picking up Burson's alert to the bot picking up the resend (this wait is Burson's, not the bot's) |
+| `Typical minutes of the bot's own work (median): from picking the alert up to its email being ready` | from the pick-up to the moment the bot's email was ready: when it went out, or, for a draft, when the bot made the draft. For an alert Burson resent, from picking up the resend the email was made from |
+| `Typical minutes a person took to send the bot's draft (median)` | from the bot's draft being ready to a person sending it (counted in drafts) |
+| `The bot's email went out first, leaving out those alerts` | as the usual line, over the same alerts as the first line of the section |
+| `The IMs' email went out first, leaving out those alerts` | the same |
+| `Alerts left out: they waited, or were being worked on, while the bot was not running, paused or failing` | how many alerts of the usual lines were left out because the bot was not running, paused or failing between Burson's post and its email being ready |
+| `Alerts left out: not known whether the bot was running (before its run log began, or while row 56 was OFF)` | how many were left out because the run log can't say (before it began, a time row 56 was OFF, or its tab could not be read) |
+| `Burson's alerts posted while the bot was OFF (never reviewed; on the "Burson while bot OFF" tab)` | the alerts the bot listed when Bot was turned back ON, posted during the pause itself, once per post; a post the bot reviewed after all, and an alert listed from before the pause, are not counted here |
+
+Each median shows how many alerts (or drafts) it is of, for example `1.5 (2 alerts)`; `—` when there are none. A note
+under the lines says since when the run log is kept, that before then it is not known whether the bot was running, and
+the stretches of the last 7 days when it was not running, paused, failing or not known (the latest 5, with their
+times). When the bot's email was about one of its own alerts from BigQuery and went out before Burson posted,
+nothing waited for the bot: that alert counts with the ones it was running for, at 0 minutes, as on the usual line.
+
+**Never estimated.** Every number is between two recorded times: when Burson posted (`source_at`), when the bot picked
+the alert up (`seen_at`), when its email was ready (`email_at`), when a person sent it (`email_sent_at`), and the ends of
+each stretch on the "When the bot ran" tab. An alert whose times the run log can't cover is counted as "not known",
+never guessed. If the "When the bot ran" tab can't be read (for example a tab the bot didn't make has its name), every
+alert is counted as not known, and the note says why.
+
+**OFF** (the default): the section is not there, the bot reads neither the "When the bot ran" tab nor the "Burson
+while bot OFF" tab for it, and the Results tab is exactly as it was.
+
 ### The Head start tab: this app's own alerts next to Burson's and the IMs'
 
 The Results tab counts only the alerts Burson posted. The **Head start** tab (`HeadStart.gs`) is about the alerts this
 app raised itself: Early Detection cards and early signals (row 19), Watch alerts (row 35) and Direct BigQuery alerts
 (row 15), told apart by the Alert log's `ingested` column. It answers: how often did this app alert a story before
 Burson did, how often before the IMs emailed, by how much, and which stories and which posts did it have first. It has
-no switch and no Control tab row ("How it works" there has one line about it). It only reads the Alert log and its own
+no switch and no Control tab row ("How it works" there has one line about it). Control row 56 (`Speed numbers: leave
+out when the bot was not running`, OFF to start) adds the speed check below to it; with row 56 OFF the tab is exactly
+as described here. It only reads the Alert log and its own
 tab, and writes only its own tab: nothing is posted in any space, nothing is emailed, Gmail and BigQuery are not asked,
 and the Alert memory is not touched.
 
@@ -1664,6 +1818,66 @@ an alert waiting. Run `refreshHeadStart()` to rebuild it now: it keeps the IMs' 
 ones follow at the next run that has them. The tab is the bot's own (its title in A1 says so): a tab named "Head
 start" that the bot didn't make is never read, cleared or written. The log says so at each rebuild, and the Control
 tab's Status (B5) from the next run on, until the first rebuild after the tab is renamed.
+
+#### The speed check (Control row 56 ON)
+
+**Why.** The numbers above count every race, also one in which the bot was not running. After a stretch with no runs
+(a stopped trigger, a wait for a permission after an update, runs that fail) this app's alerts come late, so they read
+as Burson wins. Burson's alerts posted while Bot (B2) was OFF are never on the Alert log, so a story then reads
+`No Burson alert found`, or a head start over a later alert of Burson's on another post. And a story is measured
+against Burson's first alert on the whole issue, up to 14 days earlier, so a story whose issue Burson alerted days
+before reads `behind by` days, even when this app had that very post first.
+
+**What it adds.** With row 56 ON the bot keeps its run log ("When the bot ran" tab) and lists the Burson alerts posted
+while it was OFF ("Burson while bot OFF" tab; see "When the bot ran (Control row 56)" above). The Head start tab then
+shows, next to the usual numbers, which never change:
+
+- Six more lines under **Headline numbers**, right after `Of Burson's alerts, those on a story this app had alerted
+  first (same post or same story)`, for the last 7 and the last 30 days:
+
+  | Line | What it says |
+  |---|---|
+  | `Race on the same post, while the bot was running: median head start over Burson ("behind by" when Burson was first)` | The headline race: over every post of these stories that Burson alerted too, where the bot was running the whole time from one alert to the other, this app's alert on that very post against Burson's first alert on it. One median over both sides (`behind by` when it is below 0), with how many posts it is of: `38 min (2 posts)`. `—` when there is none |
+  | `Race on the same post, while the bot was running: posts this app alerted first, and posts Burson alerted first` | `2 this app first, 1 Burson first, 1 the same minute (of 4 posts)` |
+  | `Burson alerted the issue first, on another post (not counted as a win or a loss)` | The stories whose first Burson alert was on another post of the same issue (one of the three same-story rules) and came before this app's alert: `1 story: median 11 d 1 h earlier`. Never counted as a win or a loss. A story that is a later alert on an issue this app itself alerted first (an earlier story of this app's was ahead of that same Burson alert) is not counted here either |
+  | `Not comparable: the bot was not running, paused or failing between the two alerts` | The races left out because the bot was not running, paused (Bot OFF) or failing at some point between the two alerts: `3 posts, 3 stories (see "Speed check")` |
+  | `Burson's alerts posted while the bot was OFF and never reviewed (listed when Bot was turned back ON)` | Burson's alerts on the "Burson while bot OFF" tab posted during a pause in those days and never reviewed, each post once, and how many of this app's stories were matched with one: `2 alerts; 2 of this app's stories matched one` |
+  | `Not known: from before the bot kept its run log` | The races the run log can't speak for: from before row 56 was turned ON (the run log starts then), or later than its last record, or every race when the "When the bot ran" tab can't be read: `1 post, 1 story` |
+
+  Each median has the number of posts or stories it is of next to it, as the usual lines have theirs.
+- One more note, right under the note on matching (`Matched on: …`): `The lines from "Race on the same post" on leave out
+  every race in which the bot was not running, paused or failing between the two alerts (the "When the bot ran" tab,
+  kept since <time> ET): …`. It also names any listing of an OFF stretch that did not list everything
+  (`Listing of an OFF stretch not complete: …`), and says so when the run log can't be read or has no record yet.
+- One more column in **Biggest head starts** and **Every story**, after the three hidden columns: `Speed check: was the
+  bot running?` (column V, shown). For each story it says, joined with `;`:
+  - `the bot was running the whole time` (the race the row shows is comparable);
+  - `not comparable: the bot was not running from 2026-10-14 08:23 to 2026-10-15 02:24 ET` (or `the bot was paused
+    (Bot OFF on the Control tab) from … to … ET`, `the bot's runs were failing from … to … ET`; `… and 1 more stretch`
+    when there were more);
+  - `Burson alerted this while the bot was OFF (posted … ET)` (with `; the bot picked it up when Bot was turned back ON`
+    when the bot reviewed that alert after all);
+  - `Burson alerted this issue 11 d 1 h earlier, on another post: not counted as a win or a loss`;
+  - `this app alerted this issue first (QA-1234, 2026-11-16 10:00 ET); this is a later alert on it: not counted as a win
+    or a loss`, naming this app's own earlier story;
+  - `race on the same post not comparable: …` or `race on the same post: the bot was running the whole time`, for a
+    race on one of the story's own posts that the row's own race doesn't already speak for (a post that a later card
+    brought is raced from that card);
+  - `not known: before the bot kept its run log (… ET)` (or `not known: no run recorded after … ET`);
+  - blank for a story with no Burson alert.
+
+**What it never does.** Every time in it is a recorded one (the run log's own run starts and ends, the alerts' own post
+times): nothing is estimated, and what the run log can't say reads `not known`. A gap of 10 minutes or less between
+runs counts as running. Burson's alerts listed while the bot was OFF are added for the speed check only: they never
+reach the Alert log or the usual numbers, and the usual cells (`No Burson alert found`, a head start over a later
+alert) stay as they were, with the speed check column saying what really happened. Only an alert posted during the
+pause itself counts as posted while the bot was OFF (one listed from before the pause does not). The speed check reads
+the run log and the OFF list once per rebuild, posts and emails nothing, and writes only the Head start tab. Every cell
+of it is at most 45,000 characters. When it can't be worked out, the tab is still rebuilt as usual and its note says
+so.
+
+**Turning it OFF.** At the next rebuild the tab is as it was before: the six lines, the note and the column are gone
+(the column is cleared), and nothing of the run log is read. `refreshHeadStart()` reads row 56 on the Control tab too.
 
 ### The Early Detection tab: every story it found and what became of it
 
@@ -1989,15 +2203,20 @@ The tests run the bot against fake Chat, Gemini, BigQuery and Sheets. These need
     record says the calls were not counted, C51 shows no call count, and only the run-time guard acts. Also the
     account's real daily trigger run time and outside calls (the budgets start from Google's published figures,
     which the plan marks as not verified), and how long a run that found the lock taken really costs.
+12. With row 56 ON, after the bot was paused or stopped for a while: that the "When the bot ran" tab shows that stretch
+    with the times the Apps Script Executions list shows; that the "Burson while bot OFF" tab lists the alerts Burson
+    posted meanwhile and nothing was reviewed, posted or emailed for them; and, with rows 54 and 51 ON, that the
+    dashboard's Now strip lists the same stretch and its second pick-up line no longer jumps after the stop.
 
 ## Files
 
 | File | What it is |
 |---|---|
-| `Main.gs` | `setup()`, `status()`, `listMySpaces()`, `tryAlert()`, and `poll()`, the every-minute run (one at a time: a run that finds another still going skips); at its end, the live dashboard's build id (row 54) and the slide deliveries' time trigger (row 55) |
-| `Control.gs` | The Control tab (with its switches, rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54 and 55, and the S-F Burson space, row 25), and the Resources and Guidance tabs |
+| `Main.gs` | `setup()`, `status()`, `listMySpaces()`, `tryAlert()`, and `poll()`, the every-minute run (one at a time: a run that finds another still going skips); at its end, the live dashboard's build id (row 54) and the slide deliveries' time trigger (row 55); with row 56 ON, each run taken into the run log at its start and end |
+| `Control.gs` | The Control tab (with its switches, rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54, 55 and 56, and the S-F Burson space, row 25), and the Resources and Guidance tabs |
+| `RunLog.gs` | When the bot ran (row 56): the run log ("When the bot ran" tab, with its place in the script property `RUN_LOG_OPEN`), the listing of Burson's alerts posted while the bot was OFF ("Burson while bot OFF" tab, `RUN_LOG_OFF_TODO`), and the readers the Results and Head start tabs and the dashboard use (`runLogRead_`, `runLogCheckIn_`, `offListed_`, `offListedWhileOff_`, …) |
 | `Dashboard.gs` | The live dashboard web app's entry point (`doGet`) and who may open it (`dashAccess_`: the people the bot's sheet is shared with); `webViewerCall_`, the first line of every other public function, which refuses a call from the web app |
-| `DashboardData.gs` | What the live dashboard shows (row 54), read-only from what the bot keeps |
+| `DashboardData.gs` | What the live dashboard shows (row 54), read-only from what the bot keeps; with row 56 ON also the run log (the Now strip, what the page can't see, an alert's timeline, the pick-up line) and the Head start tab's speed check column |
 | `SlideDeliveries.gs` | Slide deliveries (row 55): the bot's own `Slide deliveries` tab, the pulse slide each delivery builds, and its time trigger's handler `dashDeliverDue` |
 | `DashboardPage.html`, `DashboardCss.html`, `DashboardJs.html` | The web app's page (pushed by `clasp push` with the `.gs` files: `.claspignore` lets `.html` through) |
 | `Knowledge.gs` | The knowledge base: reads the Resources tab's documents, keeps them current in the bot's own hidden "Knowledge cache (bot)" tab, and picks the parts that bear on each alert or question |
@@ -2013,7 +2232,7 @@ The tests run the bot against fake Chat, Gemini, BigQuery and Sheets. These need
 | `ProactiveWatch.gs` | Proactive watch (row 34): a watch over every source's new rows, read-only in BigQuery (two jobs, us-central1 and US: Sonar, Tubular, Brandwatch raw mentions, Sprinklr owned posts and comments, the DSD story selection feed, the Other alerts space's alerts from the Alert log, and the Brandwatch query "2026 Election Alerts" from Brandwatch's API, its X posts' text from X's embed data), Gemini's AI.IF, AI.SCORE and AI.CLASSIFY run inside BigQuery for each watch on the Watches tab, what they'd flag on the Watch detections tab, its scorecard against Burson's alerts, and the Watch sources tab; posts nothing itself (Watch alerts, row 35, post its flags only where B35 says) With Control row 50 ON the US look also reads the AMIE table (`amie`: Brandwatch's alert feeds, each row once, after a check of its columns), and a flag from it or from Brandwatch's mentions table asks the alert memory about the last 7 days |
 | `EarlyWaveSource.gs` | Early wave & velocity producer (row 19): reads the 7 approved BigQuery source tables read-only (`US` and `us-central1`; the AMIE table only with row 48 ON, in a job of its own; with row 49 ON, the mentions Brandwatch live read, in one more job), embeds unseen low-tier posts, clusters them incrementally, checks velocity, keeps a 3-hour buffer, and (with row 39) asks about 3+ account early-watch stories |
 | `BrandwatchLive.gs` | Brandwatch live for Early Detection (row 49, OFF to start): after the run's alerts and the Watch, at most every 10 minutes, GETs only to Brandwatch's API for the mentions of the queries ticked on the New sources tab added since its last read (never X or LinkedIn), with its own 20 calls in 10 minutes and a pause when the shared login is busy; it leaves them in the script cache for Early Detection's next check (`EarlyWaveSource.gs`, the job `bwl`), and moves its mark only when that job is collected. Its state (`BWL_STATE`) and the day's counts (`BWL_DAY`) are script properties; C49 says what it is doing. It also keeps the one count of every Brandwatch mention the bot reads (`bwCountMentions_`, one line in the Watch's and in Temp checks' readers, while rows 49 and 19 are ON), and gives C19 its ending while a new source fails (`NewSources.gs` `nsrcFailingEnd_`) |
-| `OpenEngine.gs` | The open engine (row 51, OFF to start): the record of run time and outside calls (`RUN_LEDGER`, kept with row 51 OFF too: each run's seconds and calls by hour for 24 hours, the runs that found the lock taken, a run that died, Burson's pick-up times and its busiest pass; at most 8,800 characters), and under row 51 the day's safety stop and its derived ceilings (`OPEN_DAY`), the graded steps on run time and outside calls, the yield to Burson, the wait after a 429, and C51. Every later step of the open-engine plan asks it before background work starts (`openMayStart_`) |
+| `OpenEngine.gs` | The open engine (row 51, OFF to start): the record of run time and outside calls (`RUN_LEDGER`, kept with row 51 OFF too: each run's seconds and calls by hour for 24 hours, the runs that found the lock taken, a run that died, Burson's pick-up times (with Control row 56 ON also on a list of their own without the alerts posted before the bot came back after a stop, a pause or failing runs: `openPickup_`, shown only on the dashboard) and its busiest pass; at most 8,800 characters), and under row 51 the day's safety stop and its derived ceilings (`OPEN_DAY`), the graded steps on run time and outside calls, the yield to Burson, the wait after a 429, and C51. Every later step of the open-engine plan asks it before background work starts (`openMayStart_`) |
 | `EngineTab.gs` | The Engine tab (row 51): one row a check and one a day, 7 days, every cell short; never a tab the bot did not make. Later steps fill their columns with `engAdd_` / `engSet_`; the numbers between checks wait in `ENGINE_ACC` (at most 8,800 characters) |
 | `RequirementsFirst.gs` | Requirements first (row 51): `rqCheckPost_` checks a post against the alert requirements code can decide, through `escalation_` (met, failed, a judgment, gated); the KOF sheet's handle index; the counts on the Engine tab; the quick look at single posts (`rqJudgeRun_`); the first screen in front of it (`rqScreenRun_`: its instruction, input, answer check, gates, rounds, pause and day state `RQ_SCREEN`) |
 | `EarlyDetection.gs` | Early detection review and story cards (row 19): drains queued signals, runs same-story dedup (including promoting a story first flagged early into its card's thread), runs the full Gemini review, filters out dismissals, posts one story card, and records signal lifecycle events for row 46 |
@@ -2038,8 +2257,8 @@ The tests run the bot against fake Chat, Gemini, BigQuery and Sheets. These need
 | `Voice.gs` | Everything the bot writes, and the guard |
 | `Chat.gs`, `Gemini.gs` | The Google Chat API and Gemini on Vertex AI (and `geminiRequest_` / `geminiReadReply_`, the first screen's own request and reply, never through `geminiGenerate_`) |
 | `Sheets.gs`, `Store.gs` | The sheet's log tabs ("Alert log", "Message log") and what the bot remembers. No cell the bot writes goes over 49,000 characters (Sheets refuses 50,000); a JSON column is shortened so it still reads back |
-| `Speed.gs` | The Results tab: what the bot did with Burson's alerts next to what the IMs did, with Gemini's summary of the numbers; the Learned precedents tab (row 17) |
-| `HeadStart.gs` | The Head start tab: this app's own alerts (Early Detection, Watch alerts, Direct BigQuery alerts) next to Burson's alerts and the IMs' emails: who alerted a story first, and by how much |
+| `Speed.gs` | The Results tab: what the bot did with Burson's alerts next to what the IMs did, with Gemini's summary of the numbers; with row 56 ON, the speed numbers that leave out the times the bot was not running (`resultsHonest_`); the Learned precedents tab (row 17) |
+| `HeadStart.gs` | The Head start tab: this app's own alerts (Early Detection, Watch alerts, Direct BigQuery alerts) next to Burson's alerts and the IMs' emails: who alerted a story first, and by how much; with Control row 56 ON, also the speed check: the race on the same post while the bot was running, Burson alerting the issue first, and which races the bot was not running for (`headStartHonest_`) |
 | `TnsForm.gs` | The pre-filled T&S Intake Form link (the real form live; while testing, a test copy in the tester's Drive) |
 | `Watch.gs` | Watch sent alerts (24h), a Control tab switch: re-checks sent alerts' posts and replies on the email thread |
 | `Outcomes.gs` | Track post-alert outcomes, a Control tab switch: reads replies to sent alerts and logs what came of them |

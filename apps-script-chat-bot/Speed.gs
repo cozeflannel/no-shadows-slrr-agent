@@ -40,7 +40,9 @@
  * DAY; WHERE THE BOT AND THE IMs DIFFERED (the latest of each, with the bot's reason); then EVERY ALERT, one row per
  * post. The columns after "Bot alert ids" are hidden: what the next rebuild needs for its Gmail lookups. With the
  * "Track post-alert outcomes" switch ON (Outcomes.gs), EVERY ALERT has an Outcome column after "Bot alert ids" (what came
- * of the bot's Social Alert: Resolved, T&S confirmed, Comms replied, Product replied); OFF, the tab is as it was.
+ * of the bot's Social Alert: Resolved, T&S confirmed, Comms replied, Product replied); OFF, the tab is as it was. With
+ * "Speed numbers: leave out when the bot was not running" ON (Control row 56, RunLog.gs), SPEED WHILE THE BOT WAS
+ * RUNNING comes right under HEADLINE NUMBERS, whose lines don't change (resultsHonest_); OFF, the tab is as it was.
  *
  * poll() calls maybeRefreshSpeed_() at the end of every run: the tab is rebuilt right after a run that handled an alert
  * or sent an email (at most once a minute), otherwise every 10 minutes, and only with a minute left in the run. BigQuery
@@ -248,7 +250,11 @@ function refreshSpeed_(ss, ctx, opts) {
   const summary = resultsSummary_(posts, now, days, (flows.main && flows.main.label) || 'Mirror space');
   const facts = resultsFacts_(summary, noWait);
   const synopsis = resultsSynopsis_(ctx, facts, now, { timeLeft: timeLeft(30 * 1000) });
-  writeResultsTab_(sh, { posts, summary, synopsis, now, stale: im.stale, outcome: withOutcome, noWait });
+  // Speed numbers: leave out when the bot was not running (Control row 56): extra lines next to the usual ones, from the
+  // "When the bot ran" tab (RunLog.gs). OFF (the default) nothing of it runs: the run log and the "Burson while bot OFF"
+  // tab are never read, and the tab is written exactly as before
+  const honest = switchOn_(ctx, 'speedHonest') ? resultsHonestFor_(ss, posts, rows.concat(taken), now, days) : null;
+  writeResultsTab_(sh, { posts, summary, synopsis, now, stale: im.stale, outcome: withOutcome, noWait, honest });
   const props = PropertiesService.getScriptProperties();
   const layout = resultsLayoutKey_(withOutcome);
   if (props.getProperty('RESULTS_LAYOUT') !== layout) props.setProperty('RESULTS_LAYOUT', layout);
@@ -1091,6 +1097,243 @@ function resultsSynopsisLabel_(syn) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// Speed numbers: leave out when the bot was not running (Control row 56, OFF by default; RunLog.gs keeps the "When the
+// bot ran" tab). ON, the Results tab has a few more lines right under HEADLINE NUMBERS, next to the usual ones, which
+// don't change: the same alerts as their speed lines, but only those the bot was running for the whole time from
+// Burson's post until its email was ready, and that time split into the wait for the bot to run, the bot's own work and
+// a person's wait to send the bot's draft; the alerts left out are counted on their own lines (the bot not running,
+// paused or failing; not known), and so are Burson's alerts listed while the bot was OFF. Every time is one the bot
+// recorded (source_at, seen_at, email_at, email_sent_at, the run log's ends); nothing is estimated. OFF, nothing here
+// runs (refreshSpeed_ checks the switch first).
+// ---------------------------------------------------------------------------------------------------------------
+
+const RESULTS_HONEST_SECTION_ = 'SPEED WHILE THE BOT WAS RUNNING (Control row 56: leaves out the times it was not running)';
+const RESULTS_HONEST_CELL_MAX_ = 45000;  // the longest text these lines write in one cell (the note)
+// The lines' labels, in their order on the tab (resultsHonestRows_)
+const RESULTS_HONEST_LABELS_ = {
+  post_email: 'Typical minutes from Burson\'s post to the email (median): the bot, only the alerts it was running for the ' +
+    'whole time (see the note below)',
+  waited: 'Typical minutes the alert waited for the bot to run (median): from Burson\'s post to the bot picking it up',
+  resend: 'Typical minutes the bot waited for Burson to resend an alert it asked Burson to fix (median): from picking ' +
+    'up Burson\'s alert to picking up the resend',
+  own: 'Typical minutes of the bot\'s own work (median): from picking the alert up to its email being ready',
+  person: 'Typical minutes a person took to send the bot\'s draft (median)',
+  bot_first: 'The bot\'s email went out first, leaving out those alerts',
+  im_first: 'The IMs\' email went out first, leaving out those alerts',
+  down: 'Alerts left out: they waited, or were being worked on, while the bot was not running, paused or failing',
+  unknown: 'Alerts left out: not known whether the bot was running (before its run log began, or while row 56 was OFF)',
+  off: 'Burson\'s alerts posted while the bot was OFF (never reviewed; on the "Burson while bot OFF" tab)',
+};
+
+/**
+ * The run log and the alerts listed while the bot was OFF, read once for a rebuild (RunLog.gs runLogRead_, offListed_:
+ * inside poll() this run's own read), then resultsHonest_. `alertRows`: the Alert log's rows the posts were made from
+ * (Burson's, and the bot's own from BigQuery). {failed: why} when it couldn't be worked out (the tab then says so, and
+ * every other line is as usual). Never throws.
+ */
+function resultsHonestFor_(ss, posts, alertRows, now, days) {
+  try {
+    const since = now - Math.max(1, Number(days) || 7) * SPEED_DAY_;
+    const byId = new Map();
+    (alertRows || []).forEach(a => { if (a && a.alert_id) byId.set(String(a.alert_id), a); });
+    return resultsHonest_(posts, byId, runLogRead_(ss), offListed_(since, now, ss), now, days);
+  } catch (e) {
+    const why = truncate_(String((e && e.message) || e), 300);
+    console.warn(`Results tab: the speed numbers that leave out when the bot was not running couldn't be worked out: ${why}`);
+    return { failed: why };
+  }
+}
+
+/**
+ * One alert of the speed lines (resultsWindow_'s `timed`: both sent a Social Alert, both times known), checked against
+ * the run log, or null for any other post. ready: when the bot's email was ready (its sent row's email_at: a draft's is
+ * when the bot made it; else when it went out); person: a person sent the bot's draft (email_sent_by isn't the bot's,
+ * and it went out after the draft was made), sent: when; seen: when the bot picked the alert up (the earliest seen_at
+ * of its rows that aren't resends; 0 when none was recorded, and for an alert whose email was the bot's own from
+ * BigQuery); work: when the bot's own work on the email started (the seen_at of the resend the email was made from,
+ * for an alert the bot asked Burson to fix; else seen); resend: the time (ms) from seen to that resend's seen_at, the
+ * wait for Burson's resend (null without one); kind: 'ok' (running the whole time from Burson's post until the email
+ * was ready; also the bot's own email from BigQuery that went out before Burson posted, when nothing waited), 'down'
+ * (not running, paused or failing for part of it) or 'unknown' (runLogCheckIn_: not known). Pure but for GEN.
+ */
+function resultsHonestPost_(p, rowsById, log) {
+  if (!(p && p.start_known && p.bot_alerted && p.im_call === 'Social Alert' && p.bot_email_at && speedImAt_(p))) return null;
+  const rows = (p.alert_ids || []).map(id => rowsById && rowsById.get(String(id))).filter(Boolean);
+  const sentAt = a => Number(a.email_sent_at) || Number(a.email_at) || 0;
+  const sent = rows.find(a => a.email_status === 'sent' && sentAt(a) === Number(p.bot_email_at)) || null;
+  const ready = sent && Number(sent.email_at) > 0 ? Number(sent.email_at) : Number(p.bot_email_at);
+  const person = !!sent && String(sent.email_sent_by || '') !== 'bot' && Number(sent.email_at) > 0 &&
+    Number(sent.email_sent_at) > Number(sent.email_at);
+  const seens = p.bot_from_bq ? [] : rows.filter(a => !a.resend_of && Number(a.seen_at) > 0).map(a => Number(a.seen_at));
+  const seen = seens.length ? Math.min.apply(null, seens) : 0;
+  // the bot's own work starts when it picked up the alert its email came from: Burson's resend, for an alert the bot
+  // asked Burson to fix (the wait for that resend is Burson's, counted on its own line), else the alert itself
+  const resent = !p.bot_from_bq && !!sent && !!sent.resend_of && Number(sent.seen_at) > 0 ? Number(sent.seen_at) : 0;
+  const work = resent || seen;
+  // the bot's own email from BigQuery that went out before Burson posted: nothing waited for the bot, so there is
+  // nothing to check (its minutes are 0 on the usual line)
+  const early = !!p.bot_from_bq && ready <= Number(p.burson_at);
+  const check = early ? null : runLogCheckIn_(log, p.burson_at, ready);
+  return {
+    p, ready, person, sent: person ? Number(sent.email_sent_at) : 0, seen, work,
+    resend: resent && seen && resent >= seen ? resent - seen : null,
+    check, kind: !check ? 'ok' : (check.state === 'not known' ? 'unknown' : 'down'),
+  };
+}
+
+/**
+ * Burson's alerts listed while the bot was OFF (offListed_) posted in [since, now] and in their own paused stretch
+ * (offListedWhileOff_: one listed from before the pause is not one posted while the bot was OFF), once per post (on its
+ * link, else its message), without the posts the bot reviewed after all (the posts of the tab: one posted shortly
+ * before Bot was turned back ON can be on both): the time each was posted, the earliest per post. Pure.
+ */
+function resultsOffPosts_(listed, posts, since, now) {
+  const reviewed = posts || [];
+  const keys = new Set(reviewed.map(p => p.key).filter(Boolean));
+  const reddit = reviewed.map(p => p.key).filter(k => k && k.indexOf('rd:') === 0);  // a post and a comment under it
+  const unlinked = new Set(reviewed.filter(p => !p.key).map(p => p.burson_at));  // matched on when Burson posted it
+  const isReviewed = key => keys.has(key) || (key.indexOf('rd:') === 0 && reddit.some(k => samePost_(k, key)));
+  const first = new Map();
+  (listed || []).forEach(x => {
+    const at = Number(x && x.at) || 0;
+    if (!(at >= since && at <= now)) return;
+    // only one posted in its own paused stretch (RunLog.gs offListedWhileOff_): the listing starts at the last running
+    // run's start, so it can hold one from before the pause (one the bot may have reviewed then), which is not OFF
+    if (!offListedWhileOff_(x)) return;
+    const key = postKey_(x.url);
+    if (key ? isReviewed(key) : unlinked.has(at)) return;
+    const id = key || `message:${x.name || at}`;
+    if (!first.has(id) || first.get(id) > at) first.set(id, at);
+  });
+  return Array.from(first.values());
+}
+
+/** One window's numbers, from its alerts (resultsHonestPost_) and the times its OFF alerts were posted. Pure. */
+function resultsHonestWindow_(list, offAts) {
+  const ok = list.filter(x => x.kind === 'ok');
+  const minutes = (from, to) => (to - from) / SPEED_MIN_;
+  const seen = ok.filter(x => x.seen > 0);
+  const work = ok.filter(x => x.work > 0);
+  const resends = ok.filter(x => x.resend !== null && x.resend !== undefined);
+  const persons = ok.filter(x => x.person);
+  // the same minutes as the usual line (resultsWindow_): 0 when the bot's email went out before Burson posted
+  const bot = ok.map(x => (x.p.bot_from_bq ? Math.max(0, x.p.bot_email_at - x.p.burson_at) : x.p.bot_email_at - x.p.burson_at) / SPEED_MIN_);
+  const gaps = ok.map(x => (speedImAt_(x.p) - x.p.bot_email_at) / SPEED_MIN_);  // > 0: the bot was first
+  return {
+    n: ok.length, post_email: speedQuantile_(bot, 0.5),
+    waited_n: seen.length, waited: speedQuantile_(seen.map(x => minutes(x.p.burson_at, x.seen)), 0.5),
+    resend_n: resends.length, resend: speedQuantile_(resends.map(x => x.resend / SPEED_MIN_), 0.5),
+    own_n: work.length, own: speedQuantile_(work.map(x => minutes(x.work, x.ready)), 0.5),
+    person_n: persons.length, person: speedQuantile_(persons.map(x => minutes(x.ready, x.sent)), 0.5),
+    bot_first: gaps.filter(x => x > 0).length, im_first: gaps.filter(x => x < 0).length,
+    bot_lead: speedQuantile_(gaps.filter(x => x > 0), 0.5), im_lead: speedQuantile_(gaps.filter(x => x < 0).map(x => -x), 0.5),
+    down: list.filter(x => x.kind === 'down').length, unknown: list.filter(x => x.kind === 'unknown').length,
+    off: (offAts || []).length,
+  };
+}
+
+/**
+ * The speed numbers that leave out when the bot was not running, for the last 24 hours and the last `days` days:
+ * {ok, why, start, last, days, now, windows: {day, week} (resultsHonestWindow_), gaps (the run log's stretches of the
+ * bot not running, paused, failing or not known in the last `days` days, newest first: {from, to, state, why, going})}.
+ * posts: the tab's (speedPosts_, with the IMs' call filled in); rowsById: the Alert log's rows by alert_id; log:
+ * runLogRead_ (null: not readable); listed: offListed_. Over the same alerts as the speed lines of HEADLINE NUMBERS
+ * (resultsWindow_'s `timed`); an alert counts only when the bot was running the whole time from Burson's post until its
+ * email was ready (runLogCheckIn_), and is otherwise counted as left out. Pure but for GEN.
+ */
+function resultsHonest_(posts, rowsById, log, listed, now, days) {
+  const D = Math.max(1, Number(days) || 7);
+  const since = now - D * SPEED_DAY_;
+  const lg = log && typeof log === 'object' ? log
+    : { ok: false, why: 'the run log could not be read', start: 0, last: 0, spans: [] };
+  const spans = Array.isArray(lg.spans) ? lg.spans : [];
+  // the stretches near the window are enough for its alerts (their times are in it): the same answers, far less work
+  const near = Object.assign({}, lg, { spans: spans.filter(s => s.from < now + SPEED_DAY_ && s.to > since - SPEED_DAY_) });
+  const list = (posts || []).filter(p => p && p.burson_at >= since);
+  const timed = list.map(p => resultsHonestPost_(p, rowsById, near)).filter(Boolean);
+  const off = resultsOffPosts_(listed, list, since, now);
+  const win = from => resultsHonestWindow_(timed.filter(x => x.p.burson_at >= from), off.filter(at => at >= from));
+  const current = spans.some(s => s.current);  // inside poll(): this run is the last stretch
+  const gaps = lg.ok ? spans.filter(s => RUN_LOG_GAP_STATES_.indexOf(s.state) >= 0 && s.from < now && s.to > since)
+    .sort((a, b) => b.from - a.from) : [];
+  return {
+    ok: !!lg.ok, why: String(lg.why || ''), start: Number(lg.start) || 0, last: Number(lg.last) || 0, days: D, now,
+    windows: { day: win(now - SPEED_DAY_), week: win(since) },
+    gaps: gaps.map(s => ({ from: s.from, to: s.to, state: s.state, why: s.why || '', going: !!s.open && !current })),
+  };
+}
+
+/**
+ * The note under the lines: what they count, since when the run log is kept, and the stretches of the last `days` days
+ * the bot was not running (the latest 5, newest first), or why nothing is known. Pure but for GEN.
+ */
+function resultsHonestNote_(h) {
+  const T = ms => `${speedTime_(ms)} ET`;
+  const known = h.ok && h.start > 0;
+  const out = ['These lines count the same alerts as the speed lines of HEADLINE NUMBERS (both the bot and the IMs sent a ' +
+    'Social Alert, both times known), but only those where the bot was running the whole time from Burson\'s post until ' +
+    `its email was ready, as its run log shows (the "When the bot ran" tab${known ? `, kept since ${T(h.start)}` : ''}). ` +
+    'The waiting and own-work lines count only the alerts with a recorded time the bot picked them up, and a person\'s ' +
+    'wait only the bot\'s drafts a person sent. For an alert the bot asked Burson to fix, its own work starts when it ' +
+    'picked up Burson\'s resend, and the wait for that resend is on its own line. The lines of HEADLINE NUMBERS are ' +
+    'counted as before.'];
+  if (!h.ok) {
+    out.push(`The "When the bot ran" tab could not be read (${h.why || 'no reason given'}), so it is not known whether the ` +
+      'bot was running for any of these alerts: they are all counted as not known.');
+  } else if (!h.start) {
+    out.push('The bot has not started its run log yet (its first run with row 56 ON starts it), so it is not known whether ' +
+      'the bot was running for any of these alerts: they are all counted as not known.');
+  } else {
+    if (h.start > h.now - h.days * SPEED_DAY_) out.push(`Before ${T(h.start)} it is not known whether the bot was running.`);
+    if (h.gaps.length) {
+      const shown = h.gaps.slice(0, 5).map(s => runLogWords_(s) + (s.going ? ' (still going when last recorded)' : ''));
+      out.push(`In the last ${h.days} days: ${shown.join('; ')}${h.gaps.length > 5 ? `, and ${h.gaps.length - 5} more` : ''}.`);
+    } else {
+      out.push(`In the last ${h.days} days the run log shows no time when the bot was not running, paused or failing.`);
+    }
+    if (h.last && h.now > h.last + RUN_LOG_GAP_MS_) out.push(`No run is recorded after ${T(h.last)}.`);
+  }
+  return out.join(' ');
+}
+
+/**
+ * The lines on the tab, right under HEADLINE NUMBERS: [[cells, kind ('section' | 'merged' | '')]], the section, the
+ * numbers (B the last 24 hours, C the last `days` days; a median with how many alerts it is of, "—" for none), the note,
+ * a blank row. h: resultsHonest_, or {failed: why}. Pure but for GEN.
+ */
+function resultsHonestRows_(h, days) {
+  const L = RESULTS_HONEST_LABELS_;
+  const dash = '—';
+  const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
+  const med = (m, n, one, more) => (n && m !== null && m !== undefined ? `${m} (${many(n, one, more)})` : dash);
+  const first = (x, y, lead) => (y ? `${x} of ${y}${x && lead !== null && lead !== undefined ? `, by ${lead} min (median)` : ''}` : dash);
+  const section = [[RESULTS_HONEST_SECTION_, 'Last 24 hours', `Last ${days} days`], 'section'];
+  if (!h || h.failed) {
+    const why = (h && h.failed) || 'no reason given';
+    const text = `These numbers couldn't be worked out this time: ${why}. The lines above are counted as usual.`;
+    return [section, [[capCell_(speedText_(text), RESULTS_HONEST_CELL_MAX_)], 'merged'], [[], '']];
+  }
+  const d = h.windows.day;
+  const w = h.windows.week;
+  const both = (label, f) => [[label, f(d), f(w)], ''];
+  return [
+    section,
+    both(L.post_email, x => med(x.post_email, x.n, 'alert', 'alerts')),
+    both(L.waited, x => med(x.waited, x.waited_n, 'alert', 'alerts')),
+    both(L.resend, x => med(x.resend, x.resend_n, 'alert', 'alerts')),
+    both(L.own, x => med(x.own, x.own_n, 'alert', 'alerts')),
+    both(L.person, x => med(x.person, x.person_n, 'draft', 'drafts')),
+    both(L.bot_first, x => first(x.bot_first, x.n, x.bot_lead)),
+    both(L.im_first, x => first(x.im_first, x.n, x.im_lead)),
+    both(L.down, x => x.down),
+    both(L.unknown, x => x.unknown),
+    both(L.off, x => x.off),
+    [[capCell_(speedText_(resultsHonestNote_(h)), RESULTS_HONEST_CELL_MAX_)], 'merged'],
+    [[], ''],
+  ];
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // The tab
 // ---------------------------------------------------------------------------------------------------------------
 
@@ -1185,8 +1428,9 @@ function resultsRowHeight_(text) {
  * Writes the whole tab (values first, then the formats): the summary sections, then the alerts table, whose header row
  * moves with the summary's length (readSpeedState_ finds it). r: {posts, summary, synopsis, now, stale, outcome (the
  * Outcome column: Track post-alert outcomes ON), noWait (Never wait on Burson ON: the labels say the bot fixed the
- * mistakes and told Burson; OFF, that it asked Burson to fix them, as before)}. Refuses (throws, nothing cleared or
- * written) unless the tab is the one the bot made (isResultsTab_).
+ * mistakes and told Burson; OFF, that it asked Burson to fix them, as before), honest (Control row 56 ON:
+ * resultsHonest_, whose lines go right under HEADLINE NUMBERS; null OFF, and the tab is as it was)}. Refuses (throws,
+ * nothing cleared or written) unless the tab is the one the bot made (isResultsTab_).
  */
 function writeResultsTab_(sh, r) {
   if (!isResultsTab_(sh)) throw new Error(`"${sh && sh.getName()}" isn't the bot's ${RESULTS_TAB_} tab: left as it is`);
@@ -1242,6 +1486,8 @@ function writeResultsTab_(sh, r) {
     `${days} days). The IMs count as not sending one once a day passes with no sign of it. Their times come from their ` +
     `email in this mailbox (${w.im_from_email} of ${w.timed}), else from their SLRR Assistant draft.`], 'merged');
   add([]);
+  // Control row 56 ON only: the speed numbers that leave out the times the bot was not running, next to the ones above
+  if (r.honest) resultsHonestRows_(r.honest, days).forEach(([row, kind]) => add(row, kind));
 
   add([`WHAT BURSON GOT WRONG (last ${days} days)`, 'Mistakes', 'Latest example'], 'section');
   if (!s.mistakes.length) add(['No mistakes found', 0, '']);

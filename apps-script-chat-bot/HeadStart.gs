@@ -7,8 +7,9 @@
  *
  * It only reads the Alert log and its own tab, and writes only its own tab. Nothing is posted in any Chat space,
  * nothing is emailed, no Gmail search and no BigQuery read is made, the Alert memory is neither asked nor written, and
- * there is no Control tab row or switch for it (the Control tab's "How it works" has one line about it, and its Status
- * says when the tab can't be updated).
+ * there is no Control tab row or switch for the tab itself (the Control tab's "How it works" has one line about it, and
+ * its Status says when the tab can't be updated). Control row 56 ("Speed numbers: leave out when the bot was not
+ * running", OFF until a person turns it ON) adds the speed check to it, below; OFF, nothing of it is read or written.
  *
  * What's counted (headStartReport_, pure: Alert-log rows in, the stories and the numbers out):
  *   own alert    an Alert-log row whose `ingested` column is the Early Detection value (ED_ALERT_INGESTED_), the Watch
@@ -144,6 +145,20 @@
  * the A1 check before them: readHeadStartState_'s `unread`) writes nothing either: "could not read" is never taken for
  * "nothing remembered", which would drop the times of Burson's alerts the Results tab no longer shows. The log says
  * so, and the next rebuild (10 minutes on, as after any rebuild) tries again.
+ *
+ * The speed check (Control row 56 ON only; headStartHonest_). The numbers above count every race, also one in which the
+ * bot was not running: after a stretch with no runs (a stopped trigger, a wait for a permission, failing runs) or with
+ * Bot (B2) OFF, this app's alert comes late, and Burson's alerts posted while Bot was OFF are never on the Alert log, so
+ * a story then reads "No Burson alert found" or a head start over a later alert of Burson's. With row 56 ON the bot
+ * keeps a run log ("When the bot ran", RunLog.gs) and lists Burson's alerts posted while it was OFF ("Burson while bot
+ * OFF"), and the tab shows, NEXT TO the numbers above (which never change): six more headline lines (the race on the same
+ * post while the bot was running, with its signed median and how many posts it is of; Burson alerting the issue first
+ * on another post, counted apart and never as a win or a loss; the races left out because the bot was not running,
+ * paused or failing between the two alerts; Burson's alerts listed while the bot was OFF; the races from before the run
+ * log started, not known), a note, and one more column in both stories tables, after the hidden state columns, "Speed
+ * check: was the bot running?", that says it for each story ("not comparable: the bot was not running from … to … ET",
+ * "Burson alerted this while the bot was OFF (posted … ET)", "the bot was running the whole time", …). Every time in it
+ * is a recorded one: nothing is estimated, and what the run log can't say is "not known".
  */
 
 const HEAD_START_TAB_ = 'Head start';
@@ -192,13 +207,38 @@ const HEAD_START_SAME_NAME_ = 'same story (same issue name)';
 const HEAD_START_SIMILAR_ = 'same story (similar wording)';
 // "Matched on", by how sure the rule is (1 the surest): the two sure rules, then the two weaker ones (headStartMatch_)
 const HEAD_START_RULES_ = ['', HEAD_START_SAME_POST_, HEAD_START_SAME_STORY_, HEAD_START_SAME_NAME_, HEAD_START_SIMILAR_];
+// Control row 56 ON ("Speed numbers: leave out when the bot was not running"; RunLog.gs, switch key speedHonest): the
+// speed check (headStartHonest_). Six more headline lines and one more note, next to the ones that were there, and one
+// more column in both stories tables, after the hidden state columns. OFF, none of it is read, worked out or written
+const HEAD_START_CHECK_HEADER_ = 'Speed check: was the bot running?';
+const HEAD_START_STATE_COLS_ = 3;                  // the hidden state columns, from HEAD_START_STATE_COL_ on
+const HEAD_START_CHECK_PX_ = 360;                  // the speed check column's width
+const HEAD_START_CHECK_CHARS_ = 45000;             // a cell of the speed check (its lines, its note, its column), at most
+const HEAD_START_CHECK_RACES_ = 3;                 // a story's races on its own posts its speed check names, at most
+const HEAD_START_CHECK_LISTINGS_ = 3;              // unfinished OFF listings the note names, at most
+// Burson's alert tells the same story on ANOTHER post: where Burson was first, that is "Burson alerted the issue first"
+const HEAD_START_ISSUE_RULES_ = [HEAD_START_SAME_STORY_, HEAD_START_SAME_NAME_, HEAD_START_SIMILAR_];
+// The space of Burson's alerts that were listed when Bot was turned back ON (headStartOffRows_): never on the Alert log
+const HEAD_START_OFF_SPACE_ = '(listed while the bot was OFF)';
+// The six headline lines of the speed check, in their order on the tab (after the reverse-view line, before the note)
+const HEAD_START_CHECK_LINES_ = [
+  'Race on the same post, while the bot was running: median head start over Burson ("behind by" when Burson was first)',
+  'Race on the same post, while the bot was running: posts this app alerted first, and posts Burson alerted first',
+  'Burson alerted the issue first, on another post (not counted as a win or a loss)',
+  'Not comparable: the bot was not running, paused or failing between the two alerts',
+  'Burson\'s alerts posted while the bot was OFF and never reviewed (listed when Bot was turned back ON)',
+  'Not known: from before the bot kept its run log',
+];
 
-/** Run this to rebuild the Head start tab now (while the bot is ON, poll() keeps it up to date: maybeRefreshHeadStart_). */
+/**
+ * Run this to rebuild the Head start tab now (while the bot is ON, poll() keeps it up to date: maybeRefreshHeadStart_).
+ * With Control row 56 ON (read from the Control tab), with the speed check too.
+ */
 function refreshHeadStart() {
   if (webViewerCall_()) throw new Error('Not available from the dashboard');
   const ss = openStore_(false);
   const now = Date.now();
-  const out = refreshHeadStart_(ss, { now, make: true });
+  const out = refreshHeadStart_(ss, { now, make: true, honest: headStartHonestOn_(ss) });
   if (out.blocked) {  // a "Head start" tab the bot didn't make: left as it is (refreshHeadStart_ says so in the log)
     console.warn(`Head start tab not rebuilt: ${headStartBlockedText_()}`);
     return null;
@@ -239,7 +279,7 @@ function maybeRefreshHeadStart_(ss, ctx, opts) {
     if (!run && last && resultsOn && now - last < HEAD_START_EVERY_MS_ + HEAD_START_WAIT_RESULTS_MS_) return false;
     props.setProperty(HEAD_START_AT_PROP_, String(now));
     const out = refreshHeadStart_(ss, { now, im: run ? headStartImTimes_(run.posts) : null,
-      covered: run ? headStartImCovered_(run.posts) : null });
+      covered: run ? headStartImCovered_(run.posts) : null, honest: switchOn_(ctx, 'speedHonest') });
     return !!out.written;
   } catch (e) {
     console.error('Head start tab not refreshed: ' + ((e && e.message) || e));
@@ -286,6 +326,9 @@ function headStartRunBusy_(ctx, flows) {
  * way: that tab is left as it is (never read, cleared or written), nothing else is read, and the log and the Control
  * tab's Status say so (noteHeadStartBlocked_). {unread: true} when the IMs' times the bot's own tab remembers could not
  * be read (a Sheets call failed: readHeadStartState_): nothing is written, so the tab keeps them, and the log says so.
+ * opts.honest (Control row 56 ON: maybeRefreshHeadStart_ and refreshHeadStart() say): the report also gets its speed
+ * check (report.honest: headStartHonestFor_), worked out only when the tab is to be written. Without it nothing more is
+ * read than before, and the report and the tab are exactly what they were.
  */
 function refreshHeadStart_(ss, opts) {
   const o = opts || {};
@@ -307,10 +350,13 @@ function refreshHeadStart_(ss, opts) {
     return { unread: true, written: false, stories: [], top: [], windows: null };
   }
   const im = headStartImMerge_(o.im || null, o.covered || null, kept);
-  const report = headStartReport_(o.alerts || headStartAlertRows_(ss, since), im, now);
+  const rows = o.alerts || headStartAlertRows_(ss, since);
+  const report = headStartReport_(rows, im, now);
   report.im_from_run = !!o.im;
   report.written = false;
   if (!ss.getSheetByName(HEAD_START_TAB_) && !o.make && !report.stories.length) return report;  // nothing of its own to show yet
+  // Control row 56 ON: the speed check, next to the numbers above (which it never changes)
+  if (o.honest === true) report.honest = headStartHonestFor_(ss, rows, report, since, now);
   const sh = ensureHeadStartTab_(ss);
   // null: a tab the bot didn't make took the name since the check above. Left as it is; the next rebuild notes it
   if (!sh) throw new Error(`a "${HEAD_START_TAB_}" tab the bot didn't make is in the way: left as it is`);
@@ -855,6 +901,309 @@ function headStartReport_(rows, im, now) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// The speed check (Control row 56 ON): which races the bot was running for, next to the numbers above
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Control row 56 ("Speed numbers: leave out when the bot was not running") is ON on the Control tab now. Never throws. */
+function headStartHonestOn_(ss) {
+  try {
+    return readSwitches_(controlTab_(ss)).speedHonest === true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * The speed check of one rebuild (Control row 56 ON), from the Alert log's rows the report was made of (`rows`), the
+ * report (`report`), the read window's start (`since`) and `now` (ms): the run log (RunLog.gs runLogRead_) and Burson's
+ * alerts listed while the bot was OFF in the read window (offListed_), each read once. Those listed alerts are never on
+ * the Alert log: they are added to its rows as Burson's (headStartOffRows_) and the stories are matched again with them
+ * (the same stories: they are this app's own rows only), for the speed check alone. The report itself, and every cell
+ * it gives the tab, stays as it was. Never throws: a failure is logged, and the tab says the check could not be worked
+ * out this time ({failed}).
+ */
+function headStartHonestFor_(ss, rows, report, since, now) {
+  try {
+    const log = runLogRead_(ss);
+    const listed = offListed_(since, now, ss);
+    const own = Array.isArray(rows) ? rows : [];
+    const all = listed.length ? own.concat(headStartOffRows_(listed)) : own;
+    const r2 = listed.length ? headStartReport_(all, null, now) : report;
+    return headStartHonest_(r2, headStartBurson_(all), log, listed, now);
+  } catch (e) {
+    const why = truncate_(String((e && e.message) || e), 200);
+    console.error('Head start tab: the speed check could not be worked out: ' + why);
+    return { failed: why, byId: new Map(), week: null, month: null, ok: false, why, start: 0, unfinished: [] };
+  }
+}
+
+/**
+ * Burson's alerts listed while the bot was OFF (RunLog.gs offListed_) as Alert-log rows of Burson's, for the speed check
+ * only (they are never written anywhere): no alert id, `ingested` blank, timed when Burson posted (source_at and
+ * created_at), the post key and the fields the listing read from the alert as Burson wrote it, and a space that says
+ * where they come from. A listed alert without a time that is one is left out; one without a post key matches no post.
+ * Pure.
+ */
+function headStartOffRows_(listed) {
+  const out = [];
+  (Array.isArray(listed) ? listed : []).forEach(x => {
+    const at = x && typeof x === 'object' ? headStartTime_(x.at) : 0;
+    if (!at) return;
+    out.push({
+      alert_id: '', created_at: at, source_at: at, record_key: headStartText_(x.key), ingested: '',
+      space: `${headStartText_(x.space)} > ${HEAD_START_OFF_SPACE_}`,
+      forwarded_fields: { issue_name: headStartText_(x.issue), issue_status: headStartText_(x.status),
+        product: headStartText_(x.product), exposure_tag: headStartText_(x.tag), post_url: headStartText_(x.url) },
+    });
+  });
+  return out;
+}
+
+/** A story's key in the speed check's cells (headStartHonest_'s byId): its first alert's id and its time. Pure. */
+function headStartStoryKey_(s) {
+  return `${headStartText_(s && s.alert_id)}\n${Number(s && s.at) || 0}`;
+}
+
+/**
+ * The speed check (Control row 56 ON). `r`: headStartReport_ of the Alert log's rows together with Burson's alerts
+ * listed while the bot was OFF (headStartOffRows_); `burson`: headStartBurson_ of those same rows; `log`: the run log
+ * (RunLog.gs runLogRead_); `listed`: offListed_'s alerts; `now` (ms). Nothing in it is estimated: a time is a recorded
+ * one, and a race is checked against the run log from one of its two alerts to the other (runLogCheckIn_):
+ *   comparable      the bot was running the whole time between them (gaps of 10 minutes or less between runs included)
+ *   not comparable  the bot was not running, paused or failing at some point between them: left out, counted apart
+ *   not known       the run log doesn't say (from before it started, it can't be read, or it has no record that late)
+ * For each story of the last 30 days:
+ *   races on the same post   each of the story's own posts that Burson alerted too: this app's alert on THAT post (the
+ *                            story's earliest alert that carries its key: story.keys_at) against Burson's first alert on
+ *                            it; the head start is Burson's time less this app's (above 0: this app was first)
+ *   the issue first          Burson's first alert on the story is on another post (one of the three same-story rules)
+ *                            and came first: "Burson alerted this issue N earlier, on another post", never a win or a loss;
+ *                            unless an earlier story of this app's was itself first on that same alert of Burson's: then
+ *                            this story is a later alert on an issue this app alerted first, said so, and counted in none
+ *                            of the lines (its races on its own posts still are)
+ *   the story's own race     any other match (the story-level answer: "Burson alerted (ET)", "Head start over Burson"),
+ *                            checked from the story's time to Burson's alert
+ *   OFF                      Burson's alert (the story's, or one of its races') is one listed while the bot was OFF and
+ *                            posted in its own paused stretch; one the Alert log has too (the bot picked it up when Bot
+ *                            was turned back ON) is said so, and not counted with the ones never reviewed
+ * Out: {byId: Map(headStartStoryKey_ -> the story's "Speed check" cell: blank for a story without a Burson alert),
+ * week, month (the stories this app alerted in the last 7 and 30 days, as headStartWindow_ takes them: post_n,
+ * post_median_min (the signed median of the comparable races' head starts, minutes), post_first, post_behind, post_tie;
+ * issue_n, issue_median_min (how much earlier Burson was); left_posts, left_stories (not comparable); unknown_posts,
+ * unknown_stories (not known); off_alerts (Burson's alerts listed while the bot was OFF, posted in their paused stretch
+ * in those days and never reviewed, each post once), off_stories (stories one of them was matched with)), ok, why,
+ * start (the run log's), unfinished (each OFF listing of the last 30 days that did not list everything, in words)}.
+ * Pure but for GEN (the times in words).
+ */
+function headStartHonest_(r, burson, log, listed, now) {
+  const t = Number(now) || Date.now();
+  const theirs = burson && typeof burson.get === 'function' ? burson : new Map();
+  const runLog = log && typeof log === 'object' ? log
+    : { ok: false, why: 'the run log could not be read', start: 0, last: 0, spans: [] };
+  const stories = r && Array.isArray(r.stories) ? r.stories : [];
+  // only the stretches that can matter: not running, paused, failing or not known (runLogCheckIn_ looks at those alone
+  // anyway), ending after the oldest time any race below starts at (a story's, or Burson's alert on it or on its posts)
+  let oldest = t;
+  const older = v => { const ms = headStartTime_(v); if (ms && ms < oldest) oldest = ms; };
+  stories.forEach(s => {
+    try {
+      older(s.at);
+      older(s.burson && s.burson.at);
+      (Array.isArray(s.keys) ? s.keys : []).forEach((k, i) => {
+        older(Array.isArray(s.keys_at) ? s.keys_at[i] : 0);
+        const g = theirs.get(k);
+        older(g && g.at);
+      });
+    } catch (e) { /* read again, and left out, below */ }
+  });
+  const view = Object.assign({}, runLog, { spans: (Array.isArray(runLog.spans) ? runLog.spans : [])
+    .filter(sp => sp && RUN_LOG_GAP_STATES_.indexOf(sp.state) >= 0 && Number(sp.to) > oldest) });
+  const check = (a, b) => runLogCheckIn_(view, a, b);
+  const down = c => !!c && c.state !== 'not known';  // the bot was not running, paused or failing in between
+  const more = c => (c && c.more > 0 ? ` and ${c.more} more ${c.more === 1 ? 'stretch' : 'stretches'}` : '');
+  // Burson's alerts listed while the bot was OFF: by post key and time (the time of Burson's first alert on a post is
+  // the earliest of its rows, so a listed alert that is also on the Alert log, picked up as Bot was turned back ON, has
+  // the same time there). Only one posted in its own paused stretch is one posted while the bot was OFF (RunLog.gs
+  // offListedWhileOff_: the listing starts at the last running run's start, so it can hold one from before the pause).
+  // One the Alert log has too, the same post at the same time, was reviewed after all: it is still posted while the bot
+  // was OFF, but it is not counted with the ones never reviewed
+  const offAt = new Map();  // key\ntime -> reviewed (on the Alert log too)
+  const offList = [];       // the ones never reviewed: what the OFF line counts
+  (Array.isArray(listed) ? listed : []).forEach(x => {
+    const at = x && typeof x === 'object' ? headStartTime_(x.at) : 0;
+    if (!at || !offListedWhileOff_(x)) return;
+    const key = headStartText_(x.key);
+    const g = key ? theirs.get(key) : null;
+    const reviewed = !!g && Array.isArray(g.rows) && g.rows.some(row => !!row && !!row.id && Number(row.source_at) === at);
+    if (key) offAt.set(`${key}\n${at}`, reviewed);
+    if (!reviewed) offList.push({ id: key || headStartText_(x.name) || String(at), at });
+  });
+  const isOff = (key, at) => offAt.has(`${key}\n${at}`);
+  const offReviewed = (key, at) => offAt.get(`${key}\n${at}`) === true;
+  // Burson's alerts one of this app's stories was FIRST on (its story-level match, this app ahead): a later story of
+  // this app's that one of the same-story rules ties to that same alert is a later alert on an issue this app had
+  // first, never "Burson alerted the issue first". The earliest such story is the one named
+  const firstOn = new Map();  // Burson's key\ntime -> the earliest story that was ahead of it
+  stories.forEach(s => {
+    try {
+      const sb = s && s.burson && typeof s.burson === 'object' ? s.burson : null;
+      const sat = headStartTime_(s && s.at);
+      if (!sb || !sat || !(Number(s.lead_ms) > 0) || !headStartTime_(sb.at)) return;
+      const k = `${headStartText_(sb.key)}\n${headStartTime_(sb.at)}`;
+      const was = firstOn.get(k);
+      if (!was || sat < headStartTime_(was.at)) firstOn.set(k, s);
+    } catch (e) { /* left out */ }
+  });
+  const running = 'the bot was running the whole time';
+  const byId = new Map();
+  const facts = [];
+  stories.forEach(s => {
+    try {
+      const at = headStartTime_(s.at);
+      if (!at) return;
+      const b = s.burson && typeof s.burson === 'object' && headStartTime_(s.burson.at) ? s.burson : null;
+      const races = [];
+      (Array.isArray(s.keys) ? s.keys : []).forEach((k, i) => {
+        const g = theirs.get(k);
+        const their = g ? headStartTime_(g.at) : 0;
+        if (!their) return;
+        const own = headStartTime_(Array.isArray(s.keys_at) ? s.keys_at[i] : 0) || at;
+        races.push({ own, at: their, lead: their - own, c: check(own, their), off: isOff(k, their), seenOn: offReviewed(k, their) });
+      });
+      races.sort((x, y) => x.at - y.at || x.own - y.own);
+      const issueRule = !!b && HEAD_START_ISSUE_RULES_.indexOf(s.matched) >= 0 && Number(s.lead_ms) < 0;
+      // Burson's alert is one this app's own earlier story was first on: this story is a later alert on that issue
+      const earlier = issueRule ? firstOn.get(`${headStartText_(b.key)}\n${headStartTime_(b.at)}`) || null : null;
+      const issue = issueRule && !earlier;
+      const own = !!b && !issueRule;  // the story's own race is checked
+      const storyCheck = own ? check(at, b.at) : null;
+      const offRace = races.find(x => x.off) || null;
+      const offHit = b && isOff(b.key, b.at) ? { at: b.at, reviewed: offReviewed(b.key, b.at) }
+        : offRace ? { at: offRace.at, reviewed: offRace.seenOn } : null;
+      // The "Speed check" cell: what the race the row shows was, then the races on its own posts it doesn't speak for
+      const parts = [];
+      const say = text => { if (text && parts.indexOf(text) < 0) parts.push(text); };
+      if (offHit) {
+        say(`Burson alerted this while the bot was OFF (posted ${speedTime_(offHit.at)} ET` +
+          `${offHit.reviewed ? '; the bot picked it up when Bot was turned back ON' : ''})`);
+      }
+      if (issue) {
+        say(`Burson alerted this issue ${headStartWords_(-Number(s.lead_ms) / HEAD_START_MIN_MS_)} earlier, on another post: ` +
+          'not counted as a win or a loss');
+      }
+      if (earlier) {
+        say(`this app alerted this issue first (${headStartText_(earlier.alert_id) ? `${headStartText_(earlier.alert_id)}, ` : ''}` +
+          `${speedTime_(headStartTime_(earlier.at))} ET); this is a later alert on it: not counted as a win or a loss`);
+      }
+      if (own) say(!storyCheck ? running : down(storyCheck) ? `not comparable: ${storyCheck.words}${more(storyCheck)}` : storyCheck.words);
+      const rest = races.filter(x => !(own && x.own === at && x.at === b.at));  // not the story's own race again
+      const bad = [];
+      rest.forEach(x => {
+        if (!x.c) return;
+        const text = down(x.c) ? `race on the same post not comparable: ${x.c.words}${more(x.c)}` : `race on the same post ${x.c.words}`;
+        if (bad.indexOf(text) < 0 && parts.indexOf(text) < 0) bad.push(text);
+      });
+      bad.slice(0, HEAD_START_CHECK_RACES_).forEach(say);
+      if (bad.length > HEAD_START_CHECK_RACES_) {
+        say(`and ${bad.length - HEAD_START_CHECK_RACES_} more races on the same post that are not comparable or not known`);
+      }
+      if (rest.length && !bad.length && parts.indexOf(running) < 0) say(`race on the same post: ${running}`);
+      if (parts.length) byId.set(headStartStoryKey_(s), capCell_(parts.join('; '), HEAD_START_CHECK_CHARS_));
+      facts.push({ at, races, issue: issue ? -Number(s.lead_ms) : null, own, storyCheck, off: !!offHit && !offHit.reviewed });
+    } catch (e) { /* a story that can't be read is left out of the speed check */ }
+  });
+  const minutes = list => speedQuantile_(list.map(v => v / HEAD_START_MIN_MS_), 0.5);
+  const win = since => {
+    const list = facts.filter(f => f.at >= since);
+    const leads = [];
+    let leftPosts = 0;
+    let unknownPosts = 0;
+    let leftStories = 0;
+    let unknownStories = 0;
+    list.forEach(f => {
+      let left = f.own && down(f.storyCheck);
+      let unknown = f.own && !!f.storyCheck && !down(f.storyCheck);
+      f.races.forEach(x => {
+        if (!x.c) leads.push(x.lead);
+        else if (down(x.c)) { leftPosts++; left = true; }
+        else { unknownPosts++; unknown = true; }
+      });
+      if (left) leftStories++;
+      if (unknown) unknownStories++;
+    });
+    const issues = list.filter(f => f.issue !== null).map(f => f.issue);
+    const offIds = new Set(offList.filter(x => x.at >= since && x.at <= t).map(x => x.id));
+    return {
+      post_n: leads.length, post_median_min: minutes(leads), post_first: leads.filter(v => v > 0).length,
+      post_behind: leads.filter(v => v < 0).length, post_tie: leads.filter(v => v === 0).length,
+      issue_n: issues.length, issue_median_min: minutes(issues),
+      left_posts: leftPosts, left_stories: leftStories, unknown_posts: unknownPosts, unknown_stories: unknownStories,
+      off_alerts: offIds.size, off_stories: list.filter(f => f.off).length,
+    };
+  };
+  // OFF listings that did not list everything (a paused stretch's "listed" says done: false), in the last 30 days
+  const monthStart = t - HEAD_START_DAYS_ * HEAD_START_DAY_MS_;
+  const unfinished = (Array.isArray(runLog.spans) ? runLog.spans : []).filter(sp => sp && sp.state === 'paused' &&
+    sp.listed && typeof sp.listed === 'object' && sp.listed.done === false && Number(sp.to) >= monthStart).map(sp => {
+    const why = headStartText_(sp.why);
+    const cut = why.indexOf(' · ');
+    const how = cut >= 0 ? why.slice(cut + 3) : headStartText_(sp.listed.why);
+    return `${runLogWords_(sp)}${how ? ` (${how})` : ''}`;
+  });
+  return { byId, week: win(t - HEAD_START_WEEK_DAYS_ * HEAD_START_DAY_MS_), month: win(monthStart), ok: !!runLog.ok,
+    why: headStartText_(runLog.why), start: Number(runLog.start) || 0, unfinished };
+}
+
+/**
+ * The speed check's six headline lines (HEAD_START_CHECK_LINES_), each [label, last 7 days, last 30 days], from
+ * headStartHonest_'s numbers. Every median says how many races it is of, and every count what it counts. No line is
+ * without a value (the dashboard's Caught early view reads the headline lines down to the first one with neither). Pure.
+ */
+function headStartCheckRows_(h) {
+  const dash = '—';
+  const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+  const L = HEAD_START_CHECK_LINES_;
+  const both = f => [h && h.week ? f(h.week) : dash, h && h.month ? f(h.month) : dash];
+  return [
+    [L[0]].concat(both(x => (x.post_n ? `${headStartWords_(x.post_median_min)} (${n(x.post_n, 'post', 'posts')})` : dash))),
+    [L[1]].concat(both(x => (x.post_n ? `${x.post_first} this app first, ${x.post_behind} Burson first` +
+      `${x.post_tie ? `, ${x.post_tie} the same minute` : ''} (of ${n(x.post_n, 'post', 'posts')})` : dash))),
+    [L[2]].concat(both(x => (x.issue_n ? `${n(x.issue_n, 'story', 'stories')}: median ${headStartWords_(x.issue_median_min)} earlier`
+      : '0 stories'))),
+    [L[3]].concat(both(x => `${n(x.left_posts, 'post', 'posts')}, ${n(x.left_stories, 'story', 'stories')} (see "Speed check")`)),
+    [L[4]].concat(both(x => `${n(x.off_alerts, 'alert', 'alerts')}; ${x.off_stories} of this app's stories matched one`)),
+    [L[5]].concat(both(x => `${n(x.unknown_posts, 'post', 'posts')}, ${n(x.unknown_stories, 'story', 'stories')}`)),
+  ];
+}
+
+/**
+ * The speed check's note, under the note on matching: what its lines leave out and why, since when the run log is
+ * kept (or that it can't be read, or has no record yet: then every race is "not known"), and each OFF listing that did
+ * not list everything. Pure but for GEN (the times in words).
+ */
+function headStartCheckNoteText_(h) {
+  if (h && h.failed) {
+    return capCell_(`The lines from "Race on the same post" on could not be worked out this time (${h.failed}); the next ` +
+      'rebuild tries again. The lines above them are counted as before.', HEAD_START_CHECK_CHARS_);
+  }
+  const tab = `the "${RUN_LOG_TAB_}" tab`;
+  const source = !h.ok ? `${tab}, which could not be read: ${h.why || 'not known why'}; so every race is "not known"`
+    : h.start ? `${tab}, kept since ${speedTime_(h.start)} ET`
+      : `${tab}, which has no record yet; so every race is "not known"`;
+  let text = 'The lines from "Race on the same post" on leave out every race in which the bot was not running, paused or ' +
+    `failing between the two alerts (${source}): a stretch with no runs can hold back this app's alert, and Burson's ` +
+    'alerts posted while the bot was OFF were never recorded on the Alert log. They are counted apart, never as a win or ' +
+    'a loss, and the "Speed check" column says why for each story. The lines above them are counted as before.';
+  const open = Array.isArray(h.unfinished) ? h.unfinished : [];
+  open.slice(0, HEAD_START_CHECK_LISTINGS_).forEach(w => { text += ` Listing of an OFF stretch not complete: ${w}.`; });
+  if (open.length > HEAD_START_CHECK_LISTINGS_) {
+    text += ` ${open.length - HEAD_START_CHECK_LISTINGS_} more OFF stretches were not listed completely (the ` +
+      `"${RUN_LOG_TAB_}" tab says which).`;
+  }
+  return capCell_(text, HEAD_START_CHECK_CHARS_);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // The tab
 // ---------------------------------------------------------------------------------------------------------------
 
@@ -980,12 +1329,20 @@ function headStartNoteText_(r) {
 
 /**
  * The tab's cells, top to bottom, every row HEAD_START_HEADER_ wide (the last three columns are the hidden state:
- * headStartRow_): {rows, marks: {section, head, merged, numbers, times}} (row numbers for the formats; numbers: the
- * headline numbers' rows; times: [first row, count] of each stories table). Every text cell fits a cell (Sheets.gs
+ * headStartRow_): {rows, marks: {section, head, merged, numbers, times}, width} (row numbers for the formats; numbers:
+ * the headline numbers' rows; times: [first row, count] of each stories table). Every text cell fits a cell (Sheets.gs
  * capCell_). `r`: headStartReport_'s. Pure.
+ * With the speed check (`r.honest`, Control row 56 ON: headStartHonest_), and only then: its six lines right after the
+ * headline numbers that were there, its note right after theirs, and one more column, "Speed check: was the bot
+ * running?" (HEAD_START_CHECK_HEADER_), after the hidden state columns in both stories tables (width 22). Every cell
+ * that was there is the same.
  */
 function headStartTabRows_(r) {
-  const width = HEAD_START_HEADER_.length;
+  const honest = r && r.honest && typeof r.honest === 'object' ? r.honest : null;
+  const width = HEAD_START_HEADER_.length + (honest ? 1 : 0);
+  const header = honest ? HEAD_START_HEADER_.concat([HEAD_START_CHECK_HEADER_]) : HEAD_START_HEADER_;
+  const checkOf = s => (honest && honest.byId && typeof honest.byId.get === 'function'
+    ? honest.byId.get(headStartStoryKey_(s)) || '' : '');
   const rows = [];
   const marks = { section: [], head: [], merged: [], numbers: [], times: [] };
   const add = (row, kind) => {
@@ -1027,25 +1384,28 @@ function headStartTabRows_(r) {
     ['Of Burson\'s alerts, those on a story this app had alerted first (same post or same story)',
       of(w.burson_after, w.burson_alerts, w.burson_after_pct) + split(w), of(m.burson_after, m.burson_alerts, m.burson_after_pct) + split(m)],
   ].forEach(row => add(row, 'numbers'));
+  // the speed check (Control row 56 ON): its lines next to the ones above, which it never changes
+  if (honest) headStartCheckRows_(honest).forEach(row => add(row.map(v => capCell_(v, HEAD_START_CHECK_CHARS_)), 'numbers'));
   add([headStartNoteText_(r)], 'merged');
+  if (honest) add([headStartCheckNoteText_(honest)], 'merged');
   add([]);
 
   const table = list => {
     const first = rows.length + 1;
-    list.forEach(s => add(headStartRow_(s)));
+    list.forEach(s => add(honest ? headStartRow_(s).concat([checkOf(s)]) : headStartRow_(s)));
     if (list.length) marks.times.push([first, list.length]);
   };
   add([`BIGGEST HEAD STARTS (last ${HEAD_START_DAYS_} days: the ${HEAD_START_TOP_} stories this app alerted longest before Burson)`], 'section');
-  add(HEAD_START_HEADER_, 'head');
+  add(header, 'head');
   if (!r.top.length) add(['None yet']);
   table(r.top);
   add([]);
 
   add([`EVERY STORY (last ${HEAD_START_DAYS_} days, newest first; one row per story of this app's own)`], 'section');
-  add(HEAD_START_HEADER_, 'head');
+  add(header, 'head');
   if (!r.stories.length) add(['None yet']);
   table(r.stories);
-  return { rows, marks };
+  return { rows, marks, width };
 }
 
 /**
@@ -1053,13 +1413,16 @@ function headStartTabRows_(r) {
  * headStartReport_'s. Refuses (throws, nothing cleared or written) unless the tab is the one the bot made
  * (isHeadStartTab_). The new cells replace the old ones, the state columns too: the caller has read those first
  * (refreshHeadStart_), and the stories' rows written here carry the IMs' times on.
+ * With the speed check (Control row 56 ON) the tab is one column wider: "Speed check: was the bot running?", shown,
+ * after the three hidden state columns (which stay where they are, hidden as before). Turned OFF again, the next
+ * rebuild is as wide as before and clears that column with whatever else is left beyond its cells.
  */
 function writeHeadStartTab_(sh, r) {
   if (!isHeadStartTab_(sh)) throw new Error(`"${sh && sh.getName()}" isn't the bot's ${HEAD_START_TAB_} tab: left as it is`);
   const built = headStartTabRows_(r);
   const out = built.rows;
   const marks = built.marks;
-  const width = HEAD_START_HEADER_.length;
+  const width = built.width || HEAD_START_HEADER_.length;
   const prev = sh.getLastRow();
   const prevCols = sh.getLastColumn();
   const fmt = f => { try { f(); } catch (e) { /* formatting only */ } };
@@ -1092,11 +1455,19 @@ function writeHeadStartTab_(sh, r) {
   // "Head start on the post" wraps in the stories' rows: with "(from this app's alert on this post, … ET)" it is wider
   // than its column and has Burson's alert beside it, so unwrapped Sheets cuts it at the cell's edge
   marks.times.forEach(([first, count]) => fmt(() => sh.getRange(first, HEAD_START_POST_WORDS_COL_, count, 1).setWrap(true)));
+  // the speed check's column (Control row 56 ON): its header bold like the others, its cells wrapped, wide enough to read
+  if (width > HEAD_START_HEADER_.length) {
+    marks.head.forEach(row => fmt(() => sh.getRange(row, width, 1, 1).setFontWeight('bold').setBackground('#f1f3f4').setWrap(true)));
+    marks.times.forEach(([first, count]) => fmt(() => sh.getRange(first, width, count, 1).setWrap(true)));
+    fmt(() => sh.setColumnWidth(width, HEAD_START_CHECK_PX_));
+  }
   // the state columns: for the next rebuild to read (readHeadStartState_), not for people. On a tab narrower than this
   // layout (a new one, or one from before the post-level columns, whose hidden state columns were where those are
-  // now) every column is shown first. At any other rebuild the columns a person hid stay hidden
-  if (prevCols < width) fmt(() => sh.showColumns(1, width));
-  fmt(() => sh.hideColumns(HEAD_START_STATE_COL_, width - HEAD_START_STATE_COL_ + 1));
+  // now) every column is shown first. At any other rebuild the columns a person hid stay hidden. The speed check's
+  // column, the first time it is there, is shown (only it)
+  if (prevCols < HEAD_START_HEADER_.length) fmt(() => sh.showColumns(1, width));
+  else if (prevCols < width) fmt(() => sh.showColumns(prevCols + 1, width - prevCols));
+  fmt(() => sh.hideColumns(HEAD_START_STATE_COL_, HEAD_START_STATE_COLS_));
   return { rows: out.length };
 }
 

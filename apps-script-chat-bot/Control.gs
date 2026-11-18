@@ -67,8 +67,11 @@
  *                      in the web app are delivered on each delivery's schedule (a time trigger every 5 minutes that
  *                      poll() keeps while it's ON); C55 what it is doing (waiting until the bot's account approves
  *                      editing Google Slides once)
- *   A56                blank (the blank row above the help)
- *   A57...             How it works (CONTROL_HELP_ROW_, below the blank row 56)
+ *   B56                Speed numbers: leave out when the bot was not running: one more switch (RunLog.gs). ON, the bot
+ *                      keeps the "When the bot ran" tab (when it was running, paused, failing or not running) and, when
+ *                      Bot (B2) is set back ON, lists Burson's alerts posted while it was OFF on the "Burson while bot
+ *                      OFF" tab, without reviewing, posting or emailing any; C56 what it is doing
+ *   A57...             How it works (CONTROL_HELP_ROW_, right under row 56)
  *
  * Plus the Resources tab: the bot's knowledge base (Knowledge.gs). Name · Link · What it covers · Burson can see it? ·
  * Bot status. Gemini reads every document listed there to triage and action each alert and to answer questions; only
@@ -139,7 +142,7 @@ const CONTROL_HELP_ = [
     'search found sources) and the post\'s own picture, with what changed in its thread, and ' +
     'the bot works it there like an IM (emojis, the Social Alert email to the tester, the T&S test-form link, answers). ' +
     'It never posts or reacts in the Burson space. C10 shows how it is doing. Clear B10 to stop.',
-  '• Rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54 and 55 are switches for what the bot may do on its own. Each starts OFF, and OFF keeps the bot ' +
+  '• Rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54, 55 and 56 are switches for what the bot may do on its own. Each starts OFF, and OFF keeps the bot ' +
     'working as described above. Set one to ON to turn it on; column C says what it does when OFF, and what it is doing ' +
     'when ON. While Testing (row 29), every email still goes only to the tester and no live form is ever submitted.',
   '• Auto-send Social Alerts: the bot sends the Social Alert email itself, instead of leaving a Gmail draft for a person.',
@@ -367,6 +370,15 @@ const CONTROL_HELP_ = [
     'must approve editing Google Slides once (the README\'s "Slide deliveries" section says how); until then C55 ' +
     'says it is waiting. Deliveries set up while it\'s OFF wait. Nothing of it goes to S-F Burson or the Burson test ' +
     'copy.',
+  '• Speed numbers: leave out when the bot was not running: row 56, OFF until you turn it ON. ON, the bot keeps a "When ' +
+    'the bot ran" tab: when it was running, paused (Bot OFF), failing, or not running at all (no run for more than 10 ' +
+    'minutes), from the moment you turn it ON; before that it is not known. When Bot is set back ON, it lists on the ' +
+    '"Burson while bot OFF" tab the Burson alerts posted while it was OFF, without reviewing, posting or emailing anything. ' +
+    'The Results and Head start tabs then show extra speed numbers next to the usual ones, which don\'t change: the bot\'s ' +
+    'own minutes from picking an alert up, how long alerts waited for the bot to run, how long a person took to send a ' +
+    'draft, and the race on the same post, leaving out the times the bot was not running. With row 51 ON, the dashboard ' +
+    'also shows the pick-up time leaving out the alerts posted before the bot came back, next to the usual one. OFF, the ' +
+    'bot keeps no such record and the tabs are as they were.',
 ];
 // "How it works" starts here (rows 11-24 the switches, 25 S-F Burson space, 26 Burson test copy, 27-29 three more
 // switches, 30 Testing: send to, 31 BigQuery lookback, 32 one more switch (Work directly in B25), 33 Other alerts space,
@@ -374,13 +386,15 @@ const CONTROL_HELP_ = [
 // three more switches (Fast triage), 41-45 five fast-triage bars, 46 one more switch (Write early-wave records to
 // BigQuery), 47 the sixth fast-triage bar, 48-51 four more switches (Early Detection: also read the AMIE table and
 // Brandwatch live; Proactive watch: also read the AMIE table; Open engine), 52-53 left as they are (blank, or a person's
-// text), 54-55 two more switches (Live dashboard, Slide deliveries), 56 blank). It moved here from row 49 once (no tab
+// text), 54-55 two more switches (Live dashboard, Slide deliveries), 56 one more switch (Speed numbers: leave out when
+// the bot was not running; until it was one, row 56 was the blank row above the help, which now starts right under it).
+// It moved here from row 49 once (no tab
 // was ever deployed with it at row 52), then from row 53 when rows 54 and 55 became switches; a tab from before either
 // move is brought up to date on its next run (ensureSwitchRows_ writes the switch rows it lacks, writeControlHelp_
 // clears the bot's own old help from row 52 down, never a switch row and never a person's text, and writes the help
 // from row 57)
 const CONTROL_HELP_ROW_ = 57;
-const CONTROL_HELP_ROWS_ = 53;  // rows kept for the help text (blank ones clear older, longer text); one more for each new switch's line
+const CONTROL_HELP_ROWS_ = 54;  // rows kept for the help text (blank ones clear older, longer text); one more for each new switch's line
 // The first row the bot's own old help text is cleared from (writeControlHelp_): the row below row 51, the last switch
 // before the help first moved; rows 52 and 53 are otherwise left to people
 const CONTROL_HELP_CLEAR_FROM_ = 52;
@@ -452,14 +466,14 @@ function ensureControlTab_(ss, owner) {
 }
 
 /**
- * "How it works" from row 57 (CONTROL_HELP_ROW_), under the blank row 56 (rewritten by setup(), so it stays current;
+ * "How it works" from row 57 (CONTROL_HELP_ROW_), right under row 56, the last switch (rewritten by setup(), so it stays current;
  * nobody edits it). In column A of the rows from row 52 (CONTROL_HELP_CLEAR_FROM_) to the help, the bot's own old help
  * is cleared (controlHelpOwn_: its title or a help line; and any line starting with "• " in an old help's own run of
  * rows, which starts at its title or at one of its lines and ends at the first blank cell; a switch row inside it,
  * written over old help, does not end it), so a tab from before the help moved (its "How it works" at row 49, 52 or 53,
  * or higher up with switch rows written over it since) keeps no old text there: the old title at A53 is cleared;
  * anything else a person wrote there is left as it is (rows 52 and 53 are theirs; their own "•" line above a blank
- * row or above the old title too), and a switch row (54, 55) is never touched. In column A of the rows the help is
+ * row or above the old title too), and a switch row (54, 55, 56) is never touched. In column A of the rows the help is
  * written over (row 57 down, CONTROL_HELP_ROWS_ rows), a text that is not the bot's own help is a person's (a tab whose
  * help was higher up had room below it, rows 104-109): it is kept, unchanged and in order, in the first blank cells of
  * column A below the help, and the log says so. Other columns are never touched.
@@ -475,7 +489,7 @@ function writeControlHelp_(sh) {
   let oldHelp = false;  // in an old help's run of rows: from its title or one of its lines to the first blank cell
   col.forEach((v, i) => {
     const row = from + i;
-    if (switchRows.indexOf(row) >= 0) return;  // a switch row (54, 55): never touched; written over old help, it keeps its run
+    if (switchRows.indexOf(row) >= 0) return;  // a switch row (54, 55, 56): never touched; written over old help, it keeps its run
     const text = String(v === undefined || v === null ? '' : v).trim();
     oldHelp = text !== '' && (oldHelp || controlHelpOwn_(v));
     const own = controlHelpOwn_(v) || (oldHelp && text.startsWith('\u2022 '));
@@ -550,7 +564,7 @@ function controlHelpOpening_(line) {
 
 // ---------------------------------------------------------------------------------------------------------------
 // Switches (rows 11-24, then 27-29 below the two space cells, 32 below the BigQuery lookback, 34 below the Other
-// alerts space, 36-40 below Watch alerts, 46 below the fast-triage bars, 48-51 below the sixth bar, and 54-55 below
+// alerts space, 36-40 below Watch alerts, 46 below the fast-triage bars, 48-51 below the sixth bar, and 54-56 below
 // rows 52-53, which are left to people): what the bot may do on its own. Each is ON / OFF and starts OFF; OFF is the
 // bot as it was. Only a person
 // turns one ON: the bot writes OFF on a row it adds or repairs, and never changes a switch's value. (A script property
@@ -791,7 +805,28 @@ const CONTROL_SWITCHES_ = [
     // while the bot is paused (B2 OFF: extra.paused, from poll) nothing is delivered, and C55 says so
     on: (standIn, live, sw, extra) => (extra && extra.paused && typeof SLIDE_PAUSED_ON_TEXT_ === 'string' ? SLIDE_PAUSED_ON_TEXT_
       : slideDeliveriesOnText_(typeof dashScopeOk_ === 'function' && dashScopeOk_())) },
+  // Row 56, right above the help (until it became a switch, the blank row above it): the run log (RunLog.gs). ON, the bot
+  // keeps the "When the bot ran" tab and lists Burson's alerts posted while it was OFF; the Results and Head start tabs
+  // show the speed numbers that leave out the times it was not running next to the usual ones. C56 says since when the
+  // log is kept (extra.runLogStart, from poll(): Main.gs, only while ON). Its ON text doesn't depend on Testing or LIVE
+  { key: 'speedHonest', label: 'Speed numbers: leave out when the bot was not running', row: 56,
+    off: 'OFF (the speed numbers count every alert as they always have, and the bot keeps no record of when it was running)',
+    on: (standIn, live, sw, extra) => speedHonestOnText_(extra && extra.runLogStart) },
 ];
+
+// How C56's ON text starts, with or without the run log's start (controlOwnStatus_: the bot's own text, never kept)
+const SPEED_HONEST_ON_HEAD_ = '\u2713 ON: keeping the "When the bot ran" tab';
+
+/**
+ * Column C of "Speed numbers: leave out when the bot was not running" (row 56) while it's ON: `start` the run log's first
+ * record (ms: RunLog.gs runLogStart_; 0 or missing while it has none, or while its tab can't be written). Pure but for
+ * GEN (the time zone).
+ */
+function speedHonestOnText_(start) {
+  const since = Number(start) > 0 ? ` since ${speedTime_(Number(start))} ET` : '';
+  return `${SPEED_HONEST_ON_HEAD_}${since}; the Results and Head start tabs show speed numbers that leave out the ` +
+    'times the bot was not running, next to the usual ones';
+}
 
 /**
  * Column C of "Live dashboard" (row 54) while it's ON: `url` the web app's own link (ScriptApp.getService().getUrl():
@@ -833,10 +868,10 @@ function directB25OnText_(d, who) {
   return '✓ ON (the bot works right in B25 when only Google people can join it)';
 }
 
-/** Each switch's row, in CONTROL_SWITCHES_'s order: from row 11 on, or its own `row` (27-29, 32, 34, 36-40, 46, 48-51, 54-55). Pure. */
+/** Each switch's row, in CONTROL_SWITCHES_'s order: from row 11 on, or its own `row` (27-29, 32, 34, 36-40, 46, 48-51, 54-56). Pure. */
 function switchRows_() { return CONTROL_SWITCHES_.map((s, i) => s.row || SWITCH_FIRST_ROW_ + i); }
 
-/** The switch rows as runs of rows next to each other ([{start, idx: [switch index]}]: 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54-55). Pure. */
+/** The switch rows as runs of rows next to each other ([{start, idx: [switch index]}]: 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54-56). Pure. */
 function switchRowRuns_() {
   const runs = [];
   switchRows_().forEach((r, i) => {
@@ -881,7 +916,7 @@ function switchOffText_(s, switches, live, extra) {
 }
 
 /**
- * Rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54 and 55: one switch each, with its ON / OFF dropdown. A row that isn't
+ * Rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54, 55 and 56: one switch each, with its ON / OFF dropdown. A row that isn't
  * its switch yet (a tab from before it: the help text or a blank row was there, or a label someone cleared) gets it, OFF;
  * a switch already there keeps its value. "How it works" moves below them, and also when every switch is in place but
  * row 57 does not hold the help's title (a tab with the help higher up). Never sets a switch ON, and never touches rows
@@ -902,7 +937,7 @@ function ensureSwitchRows_(sh) {
     return;
   }
   const rule = SpreadsheetApp.newDataValidation().requireValueInList(['ON', 'OFF'], true).build();
-  // a person's text in rows 54-55 when their switches are written over it (beside an old help line, on a tab from
+  // a person's text in rows 54-56 when their switches are written over it (beside an old help line, on a tab from
   // before them) is kept below the help, as writeControlHelp_ keeps one in column A; the bot's own (its help, a switch's
   // label, ON or OFF, a column C status) is not. A person's ON is never carried over: the new switch starts OFF. (The
   // older switch rows are written over as they always were)
@@ -939,12 +974,13 @@ function ensureSwitchRows_(sh) {
   }
 }
 
-// The switches whose rows a person's text is kept from when they are first written (ensureSwitchRows_): rows 54-55
-const CONTROL_KEEP_TEXT_SWITCHES_ = ['liveDashboard', 'slideDeliveries'];
+// The switches whose rows a person's text is kept from when they are first written (ensureSwitchRows_): rows 54-56
+// (row 56 was the blank row above the help until it became a switch)
+const CONTROL_KEEP_TEXT_SWITCHES_ = ['liveDashboard', 'slideDeliveries', 'speedHonest'];
 
 /**
  * True when `v`, in column `c` (0 A, 1 B, 2 C) of a row a new switch is written over, is a person's text: not the bot's
- * own help (controlHelpOwn_), a switch's label, an ON / OFF value, or one of rows 54-55's own column C statuses
+ * own help (controlHelpOwn_), a switch's label, an ON / OFF value, or one of rows 54-56's own column C statuses
  * (controlOwnStatus_: a note of a person's that starts "OFF" or "✓ ON" is still theirs). Pure.
  */
 function controlPersonText_(v, c) {
@@ -956,14 +992,15 @@ function controlPersonText_(v, c) {
 }
 
 /**
- * True when `text` is one of the column C statuses the bot writes for rows 54-55 (their OFF text, an ON text, C55's
- * paused text), as it is or followed by its note (" · ..."). Pure but for GEN.
+ * True when `text` is one of the column C statuses the bot writes for rows 54-56 (their OFF text, an ON text, C55's
+ * paused text; C56's ON text with or without the run log's start), as it is or followed by its note (" · ..."). Pure
+ * but for GEN.
  */
 function controlOwnStatus_(text) {
   const own = CONTROL_SWITCHES_.filter(s => CONTROL_KEEP_TEXT_SWITCHES_.indexOf(s.key) >= 0).map(s => switchOffText_(s))
     .concat([liveDashboardOnText_('').split(' \u00b7 ')[0], slideDeliveriesOnText_(true), slideDeliveriesOnText_(false)])
     .concat(typeof SLIDE_PAUSED_ON_TEXT_ === 'string' ? [SLIDE_PAUSED_ON_TEXT_] : []);
-  return own.some(t => text === t || text.indexOf(`${t} \u00b7 `) === 0);
+  return own.some(t => text === t || text.indexOf(`${t} \u00b7 `) === 0) || text.indexOf(SPEED_HONEST_ON_HEAD_) === 0;
 }
 
 /**
@@ -1172,7 +1209,7 @@ function switchStatusTexts_(switches, standIn, notes, now, live, extra) {
 }
 
 /**
- * Writes column C of the switches (C11:C24, C27:C29, C32, C34, C36:C40, C46, C48:C51 and C54:C55, each run of rows on its own: C25 and C26 are
+ * Writes column C of the switches (C11:C24, C27:C29, C32, C34, C36:C40, C46, C48:C51 and C54:C56, each run of rows on its own: C25 and C26 are
  * the space cells' notes, and C30, C31, C33 and C35 belong to their own cells); writes nothing where it already says all
  * of it. live: this run is LIVE (Main.gs runMode_), or undefined when
  * this run doesn't know (paused, or it failed early). extra: see switchStatusTexts_.
@@ -1419,7 +1456,7 @@ function readControl_(sh) {
   out.mirror = String(m === undefined || m === null ? '' : m).trim();
   const ac = sh.getRange(AC_ROW_, 2).getValue();  // blank on a tab from before row 10 existed (help used column A only)
   out.autocorrect = String(ac === undefined || ac === null ? '' : ac).trim();
-  out.switches = readSwitches_(sh);  // rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54-55, all OFF on a tab from before them
+  out.switches = readSwitches_(sh);  // rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54-56, all OFF on a tab from before them
   // B25, only on the S-F Burson space row itself: blank on a tab from before it (no S-F Burson known: fail closed)
   const sfb = sh.getRange(SFB_ROW_, 1, 1, 2).getValues()[0];
   const sfbValue = String(sfb[1] === undefined || sfb[1] === null ? '' : sfb[1]).trim();

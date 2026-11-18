@@ -4,7 +4,7 @@
  *
  * Exposes structured, read-only MCP tools over:
  *   1. Live Control Google Sheet (`1dVGeQjLOfEYoCm_iIOmXd5hLM3rOTY_71IF-J8Hl2AI`):
- *      - `slrr_get_control_status`: Bot state, space bindings, all 31 switches (rows 11-55), B30 testers, B31 lookback validation, safety checks
+ *      - `slrr_get_control_status`: Bot state, space bindings, all 32 switches (rows 11-56), B30 testers, B31 lookback validation, safety checks
  *      - `slrr_inspect_relay_and_outbox`: `Burson outbox`, `Relay`, and `Relay names` (flags unmapped Chat users & pending/blocked items)
  *      - `slrr_inspect_parity_and_results`: `Results` and `Learned precedents` tabs (`im_only` / `bot_only` disagreements & KPIs)
  *      - `slrr_inspect_knowledge_and_guidance`: `Resources` and `Guidance` tabs (doc read health, visibility flags, active guidance)
@@ -37,10 +37,10 @@ const DRIVE_FILES_BASE = 'https://www.googleapis.com/drive/v3/files';
 const SCRIPT_PROJECTS_BASE = 'https://script.googleapis.com/v1/projects';
 const LOGGING_ENTRIES_URL = 'https://logging.googleapis.com/v2/entries:list';
 
-// These handlers take (args, deps): read logs, relay and outbox, parity and results, trace alert, resource doc and
-// Cloud Run logs. The MCP server passes args only; the tests pass deps.fetchJson with canned responses, so no test
-// reads the live sheet or the live logs. (Control status, knowledge and guidance, and the Apps Script diff always use
-// gcpFetchJson.)
+// These handlers take (args, deps): Control status, read logs, relay and outbox, parity and results, trace alert,
+// resource doc and Cloud Run logs. The MCP server passes args only; the tests pass deps.fetchJson with canned
+// responses, so no test reads the live sheet or the live logs. (Knowledge and guidance, and the Apps Script diff always
+// use gcpFetchJson.)
 function fetchJsonOf(deps) {
   return (deps && deps.fetchJson) || gcpFetchJson;
 }
@@ -97,9 +97,15 @@ function rowHasToken(obj, tokens) {
   return false;
 }
 
-async function handleGetControlStatus(args) {
+// The Control tab's switch rows, in the bot's order (Control.gs switchRows_(): test_mcp_servers.js checks they are the
+// same): 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54-55 and 56 (Speed numbers: leave out when the bot was not running)
+const CONTROL_SWITCH_ROWS = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 27, 28, 29, 32, 34, 36, 37, 38, 39, 40, 46, 48, 49,
+  50, 51, 54, 55, 56];
+
+async function handleGetControlStatus(args, deps) {
+  const fetchJson = fetchJsonOf(deps);
   const sheetId = args.sheet_id || DEFAULT_STORE_SHEET_ID;
-  const meta = await getWorkbookMetadata(sheetId);
+  const meta = await getWorkbookMetadata(sheetId, fetchJson);
   const tabs = ((meta && meta.sheets) || []).map(s => ({
     title: s.properties.title,
     hidden: !!s.properties.hidden,
@@ -108,7 +114,7 @@ async function handleGetControlStatus(args) {
   }));
 
   const gridUrl = `${SHEETS_BASE}/${encodeURIComponent(sheetId)}?ranges=${encodeURIComponent('Control!A1:C60')}&includeGridData=true`;
-  const gridDoc = await gcpFetchJson(gridUrl);
+  const gridDoc = await fetchJson(gridUrl);
   const rowData =
     (gridDoc.sheets &&
       gridDoc.sheets[0] &&
@@ -135,8 +141,7 @@ async function handleGetControlStatus(args) {
     };
   };
 
-  const switchRows = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 27, 28, 29, 32, 34, 36, 37, 38, 39, 40, 46, 48, 49, 50, 51, 54, 55];
-  const switches = switchRows.map(r => ({
+  const switches = CONTROL_SWITCH_ROWS.map(r => ({
     row: r,
     label: cellText(r, 1),
     value: cellText(r, 2),
@@ -1090,7 +1095,7 @@ const TOOLS = [
   {
     name: 'slrr_get_control_status',
     description:
-      'Read live Control tab state from the Burson QA Bot Google Sheet: Bot ON/OFF, Last check, Today stats, space links/statuses (Burson, Analyst, Mirror, Auto-correct, S-F Burson B25, Burson test copy B26), all 31 switches (row 32: Work directly in B25; row 34: Proactive watch; row 36: Temp checks; row 37: Group test emails; row 46: Write early-wave records to BigQuery; rows 48-51: the new sources and the open engine; row 54: Live dashboard; row 55: Slide deliveries), row 35 Watch alerts (where the watch\'s flags are posted: OFF, B33, B9 or B10), B30 testers, B31 BigQuery lookback validation, and live safety checks.',
+      'Read live Control tab state from the Burson QA Bot Google Sheet: Bot ON/OFF, Last check, Today stats, space links/statuses (Burson, Analyst, Mirror, Auto-correct, S-F Burson B25, Burson test copy B26), all 32 switches (row 32: Work directly in B25; row 34: Proactive watch; row 36: Temp checks; row 37: Group test emails; row 46: Write early-wave records to BigQuery; rows 48-51: the new sources and the open engine; row 54: Live dashboard; row 55: Slide deliveries; row 56: Speed numbers: leave out when the bot was not running), row 35 Watch alerts (where the watch\'s flags are posted: OFF, B33, B9 or B10), B30 testers, B31 BigQuery lookback validation, and live safety checks.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1336,4 +1341,4 @@ if (require.main === module) {
   server.start();
 }
 
-module.exports = { TOOLS, server };
+module.exports = { TOOLS, server, CONTROL_SWITCH_ROWS };

@@ -8,7 +8,9 @@
  *   poll()'s finally), the outside calls it made (every UrlFetchApp request, each request of a fetchAll counted), the
  *   runs that found the lock taken (a cache counter each run adds to before it tries the lock, costed at
  *   open_lock_loss_seconds), and a run that died, counted by the run that takes over from its claim's start. Also the
- *   day's Burson pick-up times (alert posted to handled; p50 / p90) and, under row 51, the account type read once an
+ *   day's Burson pick-up times (alert posted to handled; p50 / p90; with Control row 56 ON also, on a list of their own,
+ *   those but of the alerts posted before the bot came back after a stop, a pause or failing runs: openPickup_; the
+ *   slow pick-up guard and C51 read the first list, as before) and, under row 51, the account type read once an
  *   Eastern day ("workspace" true or false: no part of the address is kept, logged or written). One property read and
  *   one write a run; it never throws.
  *   The budgets: trigger run time B = open_runtime_budget_hours (blank: 6 on a Workspace account, 1.5 on any other)
@@ -116,7 +118,9 @@ function openEtDay_(ms) {
 
 /**
  * RUN_LEDGER: {v, h: [[hour ms, run s, calls, runs, entries]], a: {d, w}, p: [pickup s], pd, r: [[day, calls of the
- * day's busiest Burson pass]], nc: 1 when the calls could not be counted}. Never throws.
+ * day's busiest Burson pass]], nc: 1 when the calls could not be counted; and, only while Control row 56 is ON: pc
+ * [pickup s, leaving out the alerts posted before the bot came back], pcd (its day), pcs (ms: the run it started at
+ * that day)}. Never throws.
  */
 function openLedger_(props) {
   // read once a run (the run's record, C51's note and the steps share it; it is written only at the run's end)
@@ -125,13 +129,17 @@ function openLedger_(props) {
   try { L0 = JSON.parse(props.getProperty(OE_LEDGER_PROP_) || 'null'); } catch (e) { L0 = null; }
   if (!L0 || typeof L0 !== 'object' || Array.isArray(L0)) L0 = {};
   const L = {};  // only what the ledger knows is kept: its size stays bounded by construction
-  ['h', 'p', 'pd', 'r', 'nc'].forEach(k => { if (L0[k] !== undefined) L[k] = L0[k]; });
+  ['h', 'p', 'pd', 'r', 'nc', 'pc', 'pcd', 'pcs'].forEach(k => { if (L0[k] !== undefined) L[k] = L0[k]; });
   if (L0.a && typeof L0.a === 'object' && typeof L0.a.d === 'string') L.a = { d: L0.a.d.slice(0, 10), w: L0.a.w === 1 ? 1 : 0 };
   if (typeof L.pd !== 'string') delete L.pd;
   L.v = 1;
   L.h = Array.isArray(L.h) ? L.h.filter(b => Array.isArray(b) && Number(b[0]) > 0) : [];
   L.p = Array.isArray(L.p) ? L.p.map(Number).filter(x => isFinite(x) && x >= 0) : [];
   L.r = Array.isArray(L.r) ? L.r.filter(x => Array.isArray(x) && typeof x[0] === 'string' && isFinite(Number(x[1]))) : [];
+  // Control row 56 only (kept while it is ON, dropped by a run with it OFF): openPickup_
+  if (L.pc !== undefined) L.pc = Array.isArray(L.pc) ? L.pc.map(Number).filter(x => isFinite(x) && x >= 0) : [];
+  if (L.pcd !== undefined && typeof L.pcd !== 'string') delete L.pcd;
+  if (L.pcs !== undefined && !(Number(L.pcs) > 0)) delete L.pcs;
   if (OE_RUN_) OE_RUN_.L = L;
   return L;
 }
@@ -193,11 +201,24 @@ function openBursonPass_(before) {
   } catch (e) { /* not counted */ }
 }
 
-/** A Burson alert handled by its pass (Bot.gs): its pick-up time, kept for the run's record. Never throws. */
+/**
+ * A Burson alert handled by its pass (Bot.gs): its pick-up time, kept for the run's record (RUN_LEDGER.p: C51's note,
+ * the dashboard and the slow pick-up guard read it, whatever row 56 says). With Control row 56 ON ("Speed numbers: leave
+ * out when the bot was not running", RunLog.gs) the same pick-up is also kept on a list of its own (RUN_LEDGER.pc),
+ * unless the alert was posted before the bot last came back (the end of the latest stretch its run log recorded as not
+ * running, paused, failing or not known): that one waited for the bot to run, not for its work. Row 56 OFF: nothing
+ * more is read (runLogOn_ reads this run's switches, in memory) or kept. Never throws.
+ */
 function openPickup_(postedMs, now) {
   try {
     const s = Math.round(((Number(now) || Date.now()) - Number(postedMs)) / 1000);
-    if (OE_RUN_ && isFinite(s) && s >= 0 && s < 24 * 3600) OE_RUN_.pickups.push(s);
+    if (!(OE_RUN_ && isFinite(s) && s >= 0 && s < 24 * 3600)) return;
+    OE_RUN_.pickups.push(s);
+    if (typeof runLogOn_ === 'function' && runLogOn_()) {
+      const end = runLogDownEnd_();
+      if (!OE_RUN_.pickupsC) OE_RUN_.pickupsC = [];
+      if (!(end && Number(postedMs) < end)) OE_RUN_.pickupsC.push(s);
+    }
   } catch (e) { /* not counted */ }
 }
 
@@ -240,6 +261,17 @@ function openLedgerRecord_(runStart, now, tookOver) {
     const day = openEtDay_(t);
     if (L.pd !== day) { L.pd = day; L.p = []; }
     L.p = L.p.concat((OE_RUN_ && OE_RUN_.pickups) || []).slice(-OE_PICKUPS_MAX_);
+    // Control row 56 ON only: the day's pick-ups but those of alerts posted before the bot came back (openPickup_), on
+    // a list of their own, from the first run it was ON that day (pcs: it starts again after a run with it OFF, so the
+    // list never has a hole). OFF, the list is not kept: the record is the one a bot that never had row 56 ON keeps
+    if (typeof runLogOn_ === 'function' && runLogOn_()) {
+      if (L.pcd !== day || !Array.isArray(L.pc)) { L.pcd = day; L.pc = []; L.pcs = start; }
+      L.pc = L.pc.concat((OE_RUN_ && OE_RUN_.pickupsC) || []).slice(-OE_PICKUPS_MAX_);
+    } else {
+      delete L.pc;
+      delete L.pcd;
+      delete L.pcs;
+    }
     const bp = Math.max(0, Math.round((OE_RUN_ && Number(OE_RUN_.burson)) || 0));
     const today = L.r.find(x => x[0] === day);
     if (today) today[1] = Math.max(Number(today[1]) || 0, bp);
@@ -249,6 +281,7 @@ function openLedgerRecord_(runStart, now, tookOver) {
     if (openOn_()) openAccount_(L, t);
     L.h = L.h.filter(x => Number(x[0]) > t - OE_KEEP_HOURS_ * OE_HOUR_MS_).sort((x, y) => Number(x[0]) - Number(y[0]));
     let json = JSON.stringify(L);
+    while (json.length > OE_LEDGER_MAX_ && Array.isArray(L.pc) && L.pc.length) { L.pc.shift(); json = JSON.stringify(L); }
     while (json.length > OE_LEDGER_MAX_ && L.p.length) { L.p.shift(); json = JSON.stringify(L); }
     if (json.length <= OE_LEDGER_MAX_) props.setProperty(OE_LEDGER_PROP_, json);
     if (OE_RUN_) OE_RUN_.L = null;  // written: a later read in this execution reads it again
@@ -326,9 +359,17 @@ function openUsage_(now, L0) {
   const step = OE_STEPS_.filter(x => f >= x).length;
   const fetchStep = OE_FETCH_STEPS_.filter(x => ff >= x).length;
   const p = L.pd === openEtDay_(t) ? (L.p || []) : [];
-  return { runSec: Math.round(runSec), budgetSec: Math.round(budgetSec), f, fetches, fetchBudget, reserve, ff, step, fetchStep, workspace,
+  const out = { runSec: Math.round(runSec), budgetSec: Math.round(budgetSec), f, fetches, fetchBudget, reserve, ff, step, fetchStep, workspace,
     budgetFrom: cfg.budgetHours !== null ? 'setting' : 'account', counted: !L.nc,
     pickup: { p50: openQuantile_(p, 0.5), p90: openQuantile_(p, 0.9), n: p.length } };
+  // Control row 56 (only when its list is there): the pick-ups but those of alerts posted before the bot came back,
+  // today's from `since` on. The guard and C51 never read it: they read `pickup`, as before
+  if (Array.isArray(L.pc)) {
+    const pc = L.pcd === openEtDay_(t) ? L.pc : [];
+    out.pickupC = { p50: openQuantile_(pc, 0.5), p90: openQuantile_(pc, 0.9), n: pc.length,
+      since: L.pcd === openEtDay_(t) ? Number(L.pcs) || 0 : 0 };
+  }
+  return out;
 }
 
 /** The day's counts under row 51 (OPEN_DAY, the Eastern day; a new day starts from zero). Never throws. */

@@ -1085,7 +1085,7 @@ test('setup(): one run creates the control sheet (ready for testing), starts the
     'Early watch: about_google and brand_risk, each at or above',
     'Early watch: distinct accounts, at least', 'Write early-wave records to BigQuery',
     'Early watch: independent_reports at or above', 'Early Detection: also read the AMIE table', 'Early Detection: also read Brandwatch live (not X)', 'Proactive watch: also read the AMIE table', 'Open engine: judgment in place of caps', '', '',
-    'Live dashboard', 'Slide deliveries', '', 'How it works']);
+    'Live dashboard', 'Slide deliveries', 'Speed numbers: leave out when the bot was not running', 'How it works']);  // row 56 is now a switch
   eq([t.get('B29'), t.control().validations['29,2'].values], ['OFF', ['ON', 'OFF']]);  // starts OFF, like every switch
   eq([t.control().cell(32, 2), t.control().validations['32,2'].values], ['OFF', ['ON', 'OFF']]);  // row 32 too: a person turns it ON
   eq([t.control().cell(34, 2), t.control().validations['34,2'].values], ['OFF', ['ON', 'OFF']]);  // and row 34 (Proactive watch)
@@ -1952,7 +1952,7 @@ test('auto-correct space (B10) beside the Mirror space: each live Zapier alert i
     'Early watch: about_google and brand_risk, each at or above',
     'Early watch: distinct accounts, at least', 'Write early-wave records to BigQuery',
     'Early watch: independent_reports at or above', 'Early Detection: also read the AMIE table', 'Early Detection: also read Brandwatch live (not X)', 'Proactive watch: also read the AMIE table', 'Open engine: judgment in place of caps', '', '',
-    'Live dashboard', 'Slide deliveries', '', 'How it works']);
+    'Live dashboard', 'Slide deliveries', 'Speed numbers: leave out when the bot was not running', 'How it works']);  // row 56 is now a switch
   eq([t.chat.botPosts(AC), t.control().cell(10, 3)], [[], '✓ SLRR Auto-correct Test · no alerts yet today']);
 
   // Live activity in the real Burson space: chatter, an alert a person pasted, a Zapier alert with mistakes, an IM's

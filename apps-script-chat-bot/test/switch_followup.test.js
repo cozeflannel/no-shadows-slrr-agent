@@ -442,7 +442,7 @@ module.exports = H => {
           '', '',
           ['Live dashboard', 'OFF', B.switchOffText_(B.ev('CONTROL_SWITCHES_').find(s => s.row === 54))],
           ['Slide deliveries', 'OFF', B.switchOffText_(B.ev('CONTROL_SWITCHES_').find(s => s.row === 55))],
-          '', 'How it works']);
+          'Speed numbers: leave out when the bot was not running', 'How it works']);  // row 56 is a switch now (it was blank)
       eq([sh.validations['32,2'].values, sh.validations['33,2'], sh.validations['34,2'].values, sh.validations['36,2'].values, sh.validations['37,2'].values,
         sh.validations['38,2'].values, sh.validations['39,2'].values, sh.validations['40,2'].values, sh.validations['46,2'].values, sh.validations['48,2'].values, sh.validations['49,2'].values, sh.validations['50,2'].values, sh.validations['51,2'].values,
         sh.validations['54,2'].values, sh.validations['55,2'].values],

@@ -346,7 +346,7 @@ function poll() {
     alertMemoryStart_(ss, { deadline: runStart + RUN_HARD_STOP_MS_ });
     if (typeof syncBrandSafetyGroups_ === 'function') syncBrandSafetyGroups_(ss);
     control = controlTab_(ss) || ensureControlTab_(ss, Session.getEffectiveUser().getEmail());
-    ensureSwitchRows_(control);  // rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54 and 55 on a tab from before them (OFF)
+    ensureSwitchRows_(control);  // rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54, 55 and 56 on a tab from before them (OFF)
     ensureSfBursonRow_(control);  // row 25 (S-F Burson space, blank) on a tab from before it
     ensureTestCopyRow_(control);  // row 26 (Burson test copy, blank) on a tab from before it
     ensureTestersRow_(control);   // row 30 (Testing: send to, blank) on a tab from before it
@@ -356,6 +356,9 @@ function poll() {
     ensureFtBarRows_(control);    // rows 41-45 and 47 (fast-triage bars, seeds) on a tab from before them; the help is at row 57
     wanted = readControl_(control);
     ewsRunSwitches_(wanted.switches);  // EarlyWaveSource.gs: which new rows (48-51) are ON this run; unset: all OFF
+    // When the bot ran (Control row 56, RunLog.gs): this run taken into the run log, before anything else can fail. With
+    // row 56 OFF it only clears its own memory (no read, no write). Never throws
+    runLogBegin_(ss, runStart, tookOver, wanted.switches, wanted.on, control);
     testers = testersFor_(wanted.testers, control);  // C30 is kept current even while the bot is paused
     lookback = bqLookbackFor_(wanted.bqLookback, control);  // and C31
     ftBars = ftBarsFor_(wanted.ftBars, control);  // and C41:C45, C47
@@ -663,6 +666,7 @@ function poll() {
     if (issues.length) healthFail_(new Error(issues[0]), cfg.outboundBlocked ? null : cfg);
     else healthOk_(ctx);
   } catch (e) {
+    runLogFailed_(e);  // RunLog.gs: this run stopped with an error (memory only; recorded at its end with row 56 ON)
     console.error('run failed: ' + ((e && e.stack) || e));
     if (!relayRan) relayFailStop_();  // Relay.gs: it didn't run, so it starts afresh (nothing written meanwhile goes)
     if (control) {
@@ -792,12 +796,19 @@ function poll() {
           // The Engine tab (EngineTab.gs, Control row 51 only): a row for a check this run made, and the day's row
           maybeWriteEngineTab_(ss, any, { deadline: runStart + RUN_HARD_STOP_MS_, flows: [mainCtx, ac, os] });
         }
+        // Burson's alerts posted while the bot was OFF (Control row 56 only, RunLog.gs): after a paused stretch, listed
+        // on the "Burson while bot OFF" tab a page or two a run, last, never in a run still catching up on alerts. It
+        // only reads Chat: nothing is reviewed, posted or emailed, and no cursor moves. Row 56 OFF: nothing. Never throws
+        runLogListOff_(ss, {
+          deadline: runStart + RUN_HARD_STOP_MS_, cfg, sfb, wanted, standalone: acStandalone, flows: [mainCtx, ac, os],
+          exclude: [rtc && rtc.space && rtc.space.id, os && os.ctx && String(os.ctx.partition || '').split(' > ')[0]],
+        });
       }
     } catch (e) {
       console.error('after the run: ' + ((e && e.stack) || e));
     }
     try {
-      // C11:C24, C27:C29, C32, C34, C36:C40, C46, C48:C51 and C54:C55, paused or not; whether this run is LIVE (runMode_),
+      // C11:C24, C27:C29, C32, C34, C36:C40, C46, C48:C51 and C54:C56, paused or not; whether this run is LIVE (runMode_),
       // when the run got that far
       const live = mode ? mode.live : undefined;
       const extra = rtc ? { testCopy: rtc.space ? rtc.space.name : '', testCopyBroken: !rtc.space && !rtc.blank } : {};
@@ -806,6 +817,8 @@ function poll() {
       if (direct) extra.directB25 = { state: direct.state, name: direct.name };  // C32: Work directly in B25
       if (wanted) extra.watchAlerts = pwAlertsChoice_(wanted.watchAlerts);  // C34: where the watch's flags go (row 35)
       if (wanted) extra.paused = !wanted.on;  // C55: no slide is delivered while the bot is paused (B2 OFF)
+      // C56: since when the run log is kept (RunLog.gs), read only with row 56 ON
+      if (wanted && wanted.switches && wanted.switches.speedHonest === true) extra.runLogStart = runLogStart_();
       // the open engine (Control row 51, OpenEngine.gs): the day's counts, then C51's note, before column C is written
       openDaySave_();
       openWriteNote_(Date.now());
@@ -821,6 +834,8 @@ function poll() {
     // The shared alert memory (AlertMemory.gs): what every flow learned this run, written once (never throws), then gone
     alertMemoryFlush_();
     alertMemoryEnd_();
+    // When the bot ran (Control row 56 only, RunLog.gs): this run's end; nothing with row 56 OFF. Never throws
+    runLogEnd_(Date.now());
     // the run-time and outside-call record (RUN_LEDGER, always: it only records), then UrlFetchApp as it was
     openLedgerRecord_(runStart, Date.now(), tookOver);
     openRunEnd_();

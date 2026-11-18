@@ -152,6 +152,32 @@ async function runInProcessCases(sampleAlert) {
     }
   };
 
+  // --- R2: every Control switch row, row 56 included ----------------------------------------------------------
+
+  await check('control status reads every switch row the bot has, row 56 (Speed numbers: leave out when the bot was not running) included', async () => {
+    const { loadBot } = require('../apps-script-chat-bot/test/fakes.js');
+    const bot = loadBot();
+    assert.deepStrictEqual(liveOps.CONTROL_SWITCH_ROWS, Array.from(bot.switchRows_()));  // (the bot runs in a VM of its own)
+    assert.strictEqual(liveOps.CONTROL_SWITCH_ROWS.length, 32);
+    const label = 'Speed numbers: leave out when the bot was not running';
+    const offText = 'OFF (the speed numbers count every alert as they always have, and the bot keeps no record of when it was running)';
+    const grid = { 56: [label, 'OFF', offText], 2: ['Bot', 'ON', ''] };
+    const fetchJson = async url => {
+      const u = new URL(url);
+      assert.strictEqual(u.hostname, 'sheets.googleapis.com');
+      if (!u.searchParams.get('includeGridData')) return { properties: { title: 'Fake workbook' }, sheets: [{ properties: { title: 'Control' } }] };
+      const rowData = [];
+      for (let r = 1; r <= 60; r++) rowData.push({ values: (grid[r] || []).map(v => ({ formattedValue: v })) });
+      return { sheets: [{ data: [{ rowData }] }] };
+    };
+    const out = await opsTool('slrr_get_control_status').handler({ sheet_id: 'fake-sheet' }, { fetchJson });
+    const row56 = out.switches.find(x => x.row === 56);
+    assert.deepStrictEqual(row56, { row: 56, label, value: 'OFF', note: offText });
+    assert.strictEqual(out.switches.length, 32);
+    assert(/all 32 switches/.test(opsTool('slrr_get_control_status').description));
+    assert(/row 56: Speed numbers: leave out when the bot was not running/.test(opsTool('slrr_get_control_status').description));
+  });
+
   // --- A2: the newest rows of append-only tabs ----------------------------------------------------------------
 
   await check('trace finds an alert in the newest rows of a 5,700-row Alert log', async () => {

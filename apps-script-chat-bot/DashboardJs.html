@@ -105,7 +105,7 @@
   const S = {
     area: 'live',
     snap: null, snapErr: null, snapRefusal: null, loading: false, loadedAt: 0, loadedWall: 0, refreshFailed: null,
-    view: 'map', question: null, sourcesOpen: false, canSeeOpen: -1, canSeeList: false, pipelineFlash: false,
+    view: 'map', question: null, sourcesOpen: false, runLogOpen: false, canSeeOpen: -1, canSeeList: false, pipelineFlash: false,
     map: { filter: 'all', size: 'accounts', color: 'level', focus: '' },
     alerts: { q: '', status: '', level: '', kind: '', flow: '', sort: 'newest', corrected: false },
     held: 'today',
@@ -745,6 +745,9 @@
     if (counts.length) add(box, h('div', { class: 'counts' }, counts));
     const byLevel = LEVELS.filter(l => numOr(c[l]) !== null).map(l => `${fmt(c[l])} ${l}`);
     if (byLevel.length) add(box, h('p', { class: 'small muted', style: { 'margin-top': '6px' } }, `The last 24 hours by seriousness: ${byLevel.join(', ')}.`));
+    // Control row 56 ON only (the answer has health.runLog then): when the bot ran, from its run log
+    const runBox = runLogBlock(health.runLog);
+    if (runBox) add(box, runBox);
 
     const cannot = arr(health.cannotSee);
     if (cannot.length) {
@@ -783,6 +786,31 @@
     if (status) health2.push(h('p', { class: 'small muted', style: { 'margin-top': '8px' } }, `Status on the Control tab (B5): ${status}`));
     add(box, h('div', { class: 'sources' }, srcBtn, list, health2));
     return box;
+  }
+
+  /**
+   * When the bot ran, in the Now strip (Control row 56 ON: health.runLog): the newest stretch of the last 7 days in which
+   * it was not running, paused, failing or not known, in the bot's own words, with how many there were; every stretch and
+   * the notes (running the whole time, where its run log starts, no run lately) fold behind one button, as "How current
+   * each source is" does, so a bad week's list never pushes the first thing to do out of the first screen. With no
+   * stretch, the notes show as they are. Null when the answer has no run log (row 56 OFF). Pure but for the DOM.
+   */
+  function runLogBlock(v) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    const r = obj(v);
+    const cap = s => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+    const spans = arr(r.spans).map(obj).map(s => cap(txt(s.words))).filter(Boolean);
+    const notes = arr(r.notes).map(txt).filter(Boolean);
+    const total = spans.length + Math.max(0, numOr(r.more) || 0);
+    const lead = spans.length ? ` ${spans[0]}${total > 1 ? ` (the latest of ${fmt(total)} such stretches in the last 7 days)` : ''}.` : '';
+    const head = h('p', {}, h('b', {}, 'When the bot ran (last 7 days, from its run log):'), lead || null);
+    if (!spans.length) return h('div', { class: 'runlog small', id: 'runlog', style: { 'margin-top': '8px' } }, head, notes.map(n => h('p', { class: 'muted' }, n)));
+    const btn = h('button', { type: 'button', class: 'btn btn--text btn--sm disclosure', 'aria-expanded': String(!!S.runLogOpen), 'aria-controls': 'runlog-list',
+      'data-fk': 'runlog', id: 'runlog-toggle', on: { click: () => { S.runLogOpen = !S.runLogOpen; redrawNow(); } } },
+    `Every stretch, and where the run log starts (${fmt(spans.length)}${total > spans.length ? ' shown' : ''})`, icon('chevron'));
+    const list = h('div', { id: 'runlog-list', hidden: !S.runLogOpen },
+      h('ul', { class: 'plain-list' }, spans.map(s => h('li', {}, `${s}.`))), notes.map(n => h('p', { class: 'muted' }, n)));
+    return h('div', { class: 'runlog small', id: 'runlog', style: { 'margin-top': '8px' } }, head, btn, list);
   }
 
   /**
@@ -1533,7 +1561,11 @@
       const rows = [];
       if (numOr(load.runSec) !== null) rows.push(['Run time', `${fmt(load.runSec)} s of a ${fmt(load.budgetSec, 'not set')} s budget${numOr(load.share) !== null ? ` (${Math.round(load.share * 100)}%)` : ''}`]);
       if (numOr(load.calls) !== null) rows.push(['Outside calls', `${fmt(load.calls)} of ${fmt(load.callBudget, 'no set number')}`]);
-      if (numOr(load.pickupP90Sec) !== null) rows.push(['Pick-up time', `90% within ${fmt(load.pickupP90Sec)} s (${pl(load.pickupRuns, 'run', 'runs')})`]);
+      // Control row 56 ON (load.pickupNote): the pick-up time leaving out the alerts posted before the bot came back,
+      // under the usual one (which is as it was)
+      const pickNote = txt(load.pickupNote) ? h('span', { class: 'sub pickup-note' }, txt(load.pickupNote)) : null;
+      if (numOr(load.pickupP90Sec) !== null) rows.push(['Pick-up time', [`90% within ${fmt(load.pickupP90Sec)} s (${pl(load.pickupRuns, 'run', 'runs')})`, pickNote]]);
+      else if (pickNote) rows.push(['Pick-up time', ['none counted today', pickNote]]);
       const today = obj(load.today);
       if (numOr(today.reviews) !== null || numOr(today.quickLooks) !== null) rows.push(['Today', `${pl(today.reviews, 'review', 'reviews')}, ${pl(today.quickLooks, 'quick look', 'quick looks')}`]);
       const stop = obj(today.stop);
@@ -1611,13 +1643,17 @@
     add(wrap, h('h3', { class: 'section-title', style: { 'margin-top': '24px' } }, `Every story (${stories.length})`));
     if (!stories.length) add(wrap, h('p', { class: 'muted' }, 'The Head start tab lists no story of this app\'s own yet.'));
     else {
+      // Control row 56 ON, before the tab has its speed check column: says so (the answer has speedCheckWhy only then)
+      if (txt(e.speedCheckWhy)) add(wrap, h('p', { class: 'small muted' }, txt(e.speedCheckWhy)));
       add(wrap, h('div', { class: 'table-wrap' }, h('table', { class: 'table table-stack' },
         h('thead', {}, h('tr', {}, ['Story', 'This app alerted', 'Burson alerted', 'Head start', 'Matched on', 'Head start on the post', 'IMs\' email'].map(t => h('th', { scope: 'col' }, t)))),
         h('tbody', {}, stories.map(s => h('tr', {},
           h('td', {}, extLink(s.link, txt(s.story) || 'Not named'), h('span', { class: 'sub' }, [txt(s.type), txt(s.product), txt(s.tag), txt(s.appAlert)].filter(Boolean).join(' · '))),
           h('td', { 'data-label': 'This app alerted' }, txt(s.at) || '—'),
           h('td', { 'data-label': 'Burson alerted' }, txt(s.bursonAt) || '—'),
-          h('td', { 'data-label': 'Head start' }, txt(s.headStart) || '—'),
+          // Control row 56 ON: the story's speed check (was the bot running?), under its head start
+          h('td', { 'data-label': 'Head start' }, txt(s.headStart) || '—',
+            txt(s.speedCheck) ? h('span', { class: 'sub speed-check' }, `Speed check: ${txt(s.speedCheck)}`) : null),
           h('td', { 'data-label': 'Matched on' }, txt(s.matchedOn) || '—'),
           // the race on the same post: Burson's first alert on one of the story's own posts (blank when Burson alerted none of them)
           h('td', { 'data-label': 'Head start on the post' }, txt(s.postHeadStart) || '—',

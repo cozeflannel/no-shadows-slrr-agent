@@ -13,7 +13,7 @@ module.exports = H => {
   const { test, eq, assert, B, e2e, REAL } = H;
   const SWITCHES = B.ev('CONTROL_SWITCHES_');
   const at = r => SWITCHES[B.switchRows_().indexOf(r)];  // the switch on row r (rows 11-24, 27-29, 32, 34, 36-40, 46, 48-51, 54-55)
-  const NEW_ROWS = [22, 23, 24, 27, 28, 32, 34, 36, 37, 38, 39, 40, 46, 48, 49, 50, 51, 54, 55];  // + row 29, the Safety valve (its C29 says the run's mode)
+  const NEW_ROWS = [22, 23, 24, 27, 28, 32, 34, 36, 37, 38, 39, 40, 46, 48, 49, 50, 51, 54, 55, 56];  // 56: the run log's switch (RunLog.gs), new too  // + row 29, the Safety valve (its C29 says the run's mode)
   const ON_OFF = ['ON', 'OFF'];
   const LOOKBACK = ['15 minutes', '30 minutes', '45 minutes', '60 minutes'];  // B31's dropdown (the BigQuery lookback)
   const LOOKBACK_60 = B.bqLookbackFrom_('60 minutes').note;     // C31 for the 60 minutes a new row 31 starts with
@@ -81,8 +81,8 @@ module.exports = H => {
       cells(sh, 41), cells(sh, 42), cells(sh, 43), cells(sh, 44), cells(sh, 45), cells(sh, 46), cells(sh, 47), cells(sh, 48),
       cells(sh, 49), cells(sh, 50), cells(sh, 51), cells(sh, 52), cells(sh, 53), cells(sh, 54), cells(sh, 55), cells(sh, 56), sh.cell(57, 1)],
     [['Testing: send to', ''], ['BigQuery lookback', '60 minutes', LOOKBACK_60], OS33(), WA35(), TC36(), GT37(), FT(38), FT(39), FT(40),
-      BAR(41), BAR(42), BAR(43), BAR(44), BAR(45), FT(46), BAR(47), FT(48), FT(49), FT(50), FT(51), BLANK, BLANK, FT(54), FT(55), BLANK,
-      'How it works'], when);
+      BAR(41), BAR(42), BAR(43), BAR(44), BAR(45), FT(46), BAR(47), FT(48), FT(49), FT(50), FT(51), BLANK, BLANK, FT(54), FT(55), FT(56),
+      'How it works'], when);  // row 56 is a switch now (it was the blank row above the help)
     assert.match(sh.cell(30, 3), /^Blank: while Testing, enter up to 5 email addresses \(comma-separated\) to receive test emails and alerts \(nothing is sent while B30 is blank\)$/, when);
     const help = B.ev('CONTROL_HELP_');
     eq(help.map((_, i) => sh.cell(58 + i, 1)), help, when);
@@ -90,7 +90,7 @@ module.exports = H => {
     eq(lists(sh), Object.assign({}, variant.validations, { '22,2': ON_OFF, '23,2': ON_OFF, '24,2': ON_OFF, '27,2': ON_OFF,
       '28,2': ON_OFF, '29,2': ON_OFF, '31,2': LOOKBACK, '32,2': ON_OFF, '34,2': ON_OFF, '35,2': WA_CHOICES, '36,2': ON_OFF, '37,2': ON_OFF,
       '38,2': ON_OFF, '39,2': ON_OFF, '40,2': ON_OFF }, BAR_VALS, { '46,2': ON_OFF, '48,2': ON_OFF, '49,2': ON_OFF, '50,2': ON_OFF, '51,2': ON_OFF,
-      '54,2': ON_OFF, '55,2': ON_OFF }), when);
+      '54,2': ON_OFF, '55,2': ON_OFF, '56,2': ON_OFF }), when);  // and row 56's dropdown
     eq(t.bot.readControl_(sh).switches, keysOn(variant.on), when);
     eq(t.bot.readControl_(sh).sfBurson, b25 ? b25.value : '', when);
     eq(t.bot.readControl_(sh).testCopy, '', when);
@@ -182,7 +182,7 @@ module.exports = H => {
     const people = { 12: 'ON', 14: 'ON', 15: 'ON', 16: 'OFF', 17: 'ON', 19: 'ON', 22: 'ON' };
     sh.rows = sh.rows.slice(0, 22);
     for (let r = 11; r <= 22; r++) sh.rows[r - 1][1] = people[r] || 'OFF';
-    ['23,2', '24,2', '27,2', '28,2', '29,2', '31,2', '32,2', '34,2', '35,2', '36,2', '37,2', '38,2', '39,2', '40,2', '41,2', '42,2', '43,2', '44,2', '45,2', '46,2', '48,2', '49,2', '50,2', '51,2', '54,2', '55,2'].forEach(k => { delete sh.validations[k]; });
+    ['23,2', '24,2', '27,2', '28,2', '29,2', '31,2', '32,2', '34,2', '35,2', '36,2', '37,2', '38,2', '39,2', '40,2', '41,2', '42,2', '43,2', '44,2', '45,2', '46,2', '48,2', '49,2', '50,2', '51,2', '54,2', '55,2', '56,2'].forEach(k => { delete sh.validations[k]; });
     sh.rows[22] = [''];
     sh.rows[23] = ['How it works'];
     ['• old help line 1', '• Rows 11-22 are switches…', '• Relay with S-F Burson: …'].forEach((line, i) => { sh.rows[24 + i] = [line]; });
@@ -202,8 +202,8 @@ module.exports = H => {
     [ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF, LOOKBACK, ON_OFF, ON_OFF, WA_CHOICES, ON_OFF, ON_OFF, 'S-F Burson space', 'Burson test copy',
       'Testing: send to', ['BigQuery lookback', '60 minutes', LOOKBACK_60], SW32(), OS33(), SW34(), WA35(), TC36(), GT37(), FT(38), FT(39), FT(40),
       BAR(41), BAR(42), BAR(43), BAR(44), BAR(45), FT(46), BAR(47),
-      FT(48), FT(49), FT(50), FT(51), '', '', FT(54), FT(55), '', 'How it works']);
-    eq([38, 39, 40, 46, 48, 49, 50, 51, 54, 55].map(r => sh.validations[`${r},2`].values), [ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF]);
+      FT(48), FT(49), FT(50), FT(51), '', '', FT(54), FT(55), at(56).label, 'How it works']);  // row 56 is a switch now (it was blank)
+    eq([38, 39, 40, 46, 48, 49, 50, 51, 54, 55, 56].map(r => sh.validations[`${r},2`].values), [ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF, ON_OFF]);
     assert.ok(!sh.rows.some(r => /old help line|Rows 11-22/.test(String(r[0]))));
     eq(t.bot.readControl_(sh).switches, keysOn([12, 14, 15, 17, 19, 22]));
   });
@@ -234,7 +234,7 @@ module.exports = H => {
       ['Draft answers to questions', 'OFF', B.switchOffText_(at(28))], ['Safety valve', 'OFF', valveC(NO_SFB)],
       ['Testing: send to', ''], ['BigQuery lookback', '60 minutes', LOOKBACK_60], SW32(), OS33(), SW34(), WA35(), TC36(), GT37(), FT(38), FT(39), FT(40),
       BAR(41), BAR(42), BAR(43), BAR(44), BAR(45), FT(46), BAR(47), FT(48),
-      FT(49), FT(50), FT(51), BLANK, BLANK, FT(54), FT(55), BLANK, 'How it works', B.ev('CONTROL_HELP_')[0]]);
+      FT(49), FT(50), FT(51), BLANK, BLANK, FT(54), FT(55), FT(56), 'How it works', B.ev('CONTROL_HELP_')[0]]);  // row 56 is a switch now (it was blank)
     assert.ok(!sh.rows.some(r => /old help line|Rows 11-24 are switches…/.test(String(r[0]))));
     // no dropdown moved or dropped; only the new switches', the BigQuery lookback's, Watch alerts', and the bar rows' (B25 and B26 have none: a space goes there)
     eq(lists(sh), Object.assign({}, lists0, { '27,2': ON_OFF, '28,2': ON_OFF, '29,2': ON_OFF, '31,2': LOOKBACK, '32,2': ON_OFF, '34,2': ON_OFF,
@@ -262,6 +262,6 @@ module.exports = H => {
     // the only value the bot writes in column B of a switch row is OFF (a row it adds or repairs)
     const t = e2e();
     t.bot.setup();
-    eq(B.switchRows_().map(r => t.control().cell(r, 2)), Array(31).fill('OFF'));
+    eq(B.switchRows_().map(r => t.control().cell(r, 2)), Array(32).fill('OFF'));  // 32 switches now: row 56 is one too
   });
 };

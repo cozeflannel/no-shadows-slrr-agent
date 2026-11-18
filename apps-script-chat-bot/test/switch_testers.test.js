@@ -234,7 +234,7 @@ module.exports = function ({ assert, F, B, NOW, test, eq, world, e2e, decodeMime
         'Early watch: distinct accounts, at least', '3',
         'Write early-wave records to BigQuery', 'OFF', 'Early watch: independent_reports at or above', '0.30',
         'Early Detection: also read the AMIE table', 'OFF', 'Early Detection: also read Brandwatch live (not X)', 'OFF', 'Proactive watch: also read the AMIE table', 'OFF', 'Open engine: judgment in place of caps', 'OFF', '', '',
-        'Live dashboard', 'OFF', 'Slide deliveries', 'OFF', '', 'How it works']);
+        'Live dashboard', 'OFF', 'Slide deliveries', 'OFF', 'Speed numbers: leave out when the bot was not running', 'How it works']);  // row 56 is a switch now (it was blank)
 
     sh.getRange(30, 1).setValue('');
     sh.getRange(30, 2).setValue('keepme@external.test');
